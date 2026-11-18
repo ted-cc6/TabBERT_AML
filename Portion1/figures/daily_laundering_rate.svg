@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="753" viewBox="0 0 900 753">
+<rect width="100%" height="100%" fill="white"/>
+<text x="20" y="35" font-family="Arial" font-size="22" font-weight="bold">Daily laundering rate</text>
+<text x="20" y="87" font-family="Arial" font-size="14">2022/09/01</text>
+<rect x="240" y="70" width="1.0" height="22" fill="#a35377"/>
+<text x="248.2" y="87" font-family="Arial" font-size="13">0.029%</text>
+<text x="20" y="123" font-family="Arial" font-size="14">2022/09/02</text>
+<rect x="240" y="106" width="1.0" height="22" fill="#a35377"/>
+<text x="248.4" y="123" font-family="Arial" font-size="13">0.054%</text>
+<text x="20" y="159" font-family="Arial" font-size="14">2022/09/03</text>
+<rect x="240" y="142" width="1.4" height="22" fill="#a35377"/>
+<text x="249.4" y="159" font-family="Arial" font-size="13">0.189%</text>
+<text x="20" y="195" font-family="Arial" font-size="14">2022/09/04</text>
+<rect x="240" y="178" width="1.4" height="22" fill="#a35377"/>
+<text x="249.4" y="195" font-family="Arial" font-size="13">0.196%</text>
+<text x="20" y="231" font-family="Arial" font-size="14">2022/09/05</text>
+<rect x="240" y="214" width="1.0" height="22" fill="#a35377"/>
+<text x="248.7" y="231" font-family="Arial" font-size="13">0.098%</text>
+<text x="20" y="267" font-family="Arial" font-size="14">2022/09/06</text>
+<rect x="240" y="250" width="1.0" height="22" fill="#a35377"/>
+<text x="248.8" y="267" font-family="Arial" font-size="13">0.110%</text>
+<text x="20" y="303" font-family="Arial" font-size="14">2022/09/07</text>
+<rect x="240" y="286" width="1.0" height="22" fill="#a35377"/>
+<text x="248.7" y="303" font-family="Arial" font-size="13">0.103%</text>
+<text x="20" y="339" font-family="Arial" font-size="14">2022/09/08</text>
+<rect x="240" y="322" width="1.0" height="22" fill="#a35377"/>
+<text x="248.8" y="339" font-family="Arial" font-size="13">0.112%</text>
+<text x="20" y="375" font-family="Arial" font-size="14">2022/09/09</text>
+<rect x="240" y="358" width="1.0" height="22" fill="#a35377"/>
+<text x="248.6" y="375" font-family="Arial" font-size="13">0.079%</text>
+<text x="20" y="411" font-family="Arial" font-size="14">2022/09/10</text>
+<rect x="240" y="394" width="1.5" height="22" fill="#a35377"/>
+<text x="249.5" y="411" font-family="Arial" font-size="13">0.212%</text>
+<text x="20" y="447" font-family="Arial" font-size="14">2022/09/11</text>
+<rect x="240" y="430" width="422.9" height="22" fill="#a35377"/>
+<text x="670.9" y="447" font-family="Arial" font-size="13">58.586%</text>
+<text x="20" y="483" font-family="Arial" font-size="14">2022/09/12</text>
+<rect x="240" y="466" width="436.7" height="22" fill="#a35377"/>
+<text x="684.7" y="483" font-family="Arial" font-size="13">60.498%</text>
+<text x="20" y="519" font-family="Arial" font-size="14">2022/09/13</text>
+<rect x="240" y="502" width="415.9" height="22" fill="#a35377"/>
+<text x="663.9" y="519" font-family="Arial" font-size="13">57.609%</text>
+<text x="20" y="555" font-family="Arial" font-size="14">2022/09/14</text>
+<rect x="240" y="538" width="417.6" height="22" fill="#a35377"/>
+<text x="665.6" y="555" font-family="Arial" font-size="13">57.851%</text>
+<text x="20" y="591" font-family="Arial" font-size="14">2022/09/15</text>
+<rect x="240" y="574" width="439.4" height="22" fill="#a35377"/>
+<text x="687.4" y="591" font-family="Arial" font-size="13">60.870%</text>
+<text x="20" y="627" font-family="Arial" font-size="14">2022/09/16</text>
+<rect x="240" y="610" width="408.0" height="22" fill="#a35377"/>
+<text x="656.0" y="627" font-family="Arial" font-size="13">56.522%</text>
+<text x="20" y="663" font-family="Arial" font-size="14">2022/09/17</text>
+<rect x="240" y="646" width="470.8" height="22" fill="#a35377"/>
+<text x="718.8" y="663" font-family="Arial" font-size="13">65.217%</text>
+<text x="20" y="699" font-family="Arial" font-size="14">2022/09/18</text>
+<rect x="240" y="682" width="525.0" height="22" fill="#a35377"/>
+<text x="773.0" y="699" font-family="Arial" font-size="13">72.727%</text>
+</svg>

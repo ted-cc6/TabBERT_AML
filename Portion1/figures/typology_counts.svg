@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="429" viewBox="0 0 900 429">
+<rect width="100%" height="100%" fill="white"/>
+<text x="20" y="35" font-family="Arial" font-size="22" font-weight="bold">Laundering typologies</text>
+<text x="20" y="87" font-family="Arial" font-size="14">UNTAGGED</text>
+<rect x="240" y="70" width="525.0" height="22" fill="#8b6596"/>
+<text x="773.0" y="87" font-family="Arial" font-size="13">1,968</text>
+<text x="20" y="123" font-family="Arial" font-size="14">GATHER-SCATTER</text>
+<rect x="240" y="106" width="191.0" height="22" fill="#8b6596"/>
+<text x="439.0" y="123" font-family="Arial" font-size="13">716</text>
+<text x="20" y="159" font-family="Arial" font-size="14">SCATTER-GATHER</text>
+<rect x="240" y="142" width="167.0" height="22" fill="#8b6596"/>
+<text x="415.0" y="159" font-family="Arial" font-size="13">626</text>
+<text x="20" y="195" font-family="Arial" font-size="14">STACK</text>
+<rect x="240" y="178" width="124.3" height="22" fill="#8b6596"/>
+<text x="372.3" y="195" font-family="Arial" font-size="13">466</text>
+<text x="20" y="231" font-family="Arial" font-size="14">FAN-OUT</text>
+<rect x="240" y="214" width="91.2" height="22" fill="#8b6596"/>
+<text x="339.2" y="231" font-family="Arial" font-size="13">342</text>
+<text x="20" y="267" font-family="Arial" font-size="14">FAN-IN</text>
+<rect x="240" y="250" width="84.8" height="22" fill="#8b6596"/>
+<text x="332.8" y="267" font-family="Arial" font-size="13">318</text>
+<text x="20" y="303" font-family="Arial" font-size="14">CYCLE</text>
+<rect x="240" y="286" width="76.6" height="22" fill="#8b6596"/>
+<text x="324.6" y="303" font-family="Arial" font-size="13">287</text>
+<text x="20" y="339" font-family="Arial" font-size="14">BIPARTITE</text>
+<rect x="240" y="322" width="70.2" height="22" fill="#8b6596"/>
+<text x="318.2" y="339" font-family="Arial" font-size="13">263</text>
+<text x="20" y="375" font-family="Arial" font-size="14">RANDOM</text>
+<rect x="240" y="358" width="51.0" height="22" fill="#8b6596"/>
+<text x="299.0" y="375" font-family="Arial" font-size="13">191</text>
+</svg>

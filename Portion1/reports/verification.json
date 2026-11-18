@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "token_shape": [
+    10156690,
+    6
+  ],
+  "split_counts": [
+    {
+      "split": "tail",
+      "transactions": 1108,
+      "laundering": 655
+    },
+    {
+      "split": "test",
+      "transactions": 862792,
+      "laundering": 956
+    },
+    {
+      "split": "train",
+      "transactions": 3248921,
+      "laundering": 2530
+    },
+    {
+      "split": "valid",
+      "transactions": 965524,
+      "laundering": 1036
+    }
+  ],
+  "pattern_matches": 3209,
+  "sample_windows_checked": 1000,
+  "full_train_list_rows": 3248921,
+  "full_train_list_positives": 2530
+}

@@ -1,0 +1,23 @@
+{
+  "dataset": "IBM AML HI-Small",
+  "dataset_url": "https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml",
+  "reference_script": "https://github.com/IBM/Multi-GNN/blob/main/format_kaggle_files.py",
+  "raw_sha256": {
+    "HI-Small_Trans.csv.gz": "c7f8fedaeec585d84cbece682b0a1691f6ee2b1c35d8a1305364716ea25f48e4",
+    "HI-Small_Patterns.txt": "2c546b5ce6009e73851f0139af053cf845f08bf92f3bc82fe1eb937dec2ef39b"
+  },
+  "transaction_count": 5078345,
+  "positive_count": 5177,
+  "event_count": 10156690,
+  "matched_pattern_row_keys": 3209,
+  "missing_values": {},
+  "min_timestamp_minute": 1063294560,
+  "max_timestamp_minute": 1063320018,
+  "train_end_exclusive_minute": 1063303200,
+  "valid_end_exclusive_minute": 1063306080,
+  "account_count": 515088,
+  "sequence_length": 32,
+  "max_train_gap_minutes": 8627,
+  "max_train_amount": 1046302363293.48,
+  "primary_end_exclusive_minute": 1063308960
+}

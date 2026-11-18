@@ -1,0 +1,5 @@
+# Exclude local runtime files.
+*.sqlite
+*.sqlite-*
+__pycache__/
+.ipynb_checkpoints/

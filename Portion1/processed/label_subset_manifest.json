@@ -1,0 +1,77 @@
+{
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "fractions_exported": [
+    0.01,
+    0.02,
+    0.05,
+    0.2
+  ],
+  "fraction_1_0": "all train transactions",
+  "fraction_1_0_file": "label_subset_100pct.csv.gz",
+  "fraction_1_0_reused_for_seeds": [
+    42,
+    43,
+    44
+  ],
+  "fraction_1_0_counts": {
+    "positive": 2530,
+    "negative": 3246391
+  },
+  "train_positive": 2530,
+  "train_negative": 3246391,
+  "added_2_percent_due_to_under_30_positives_at_1_percent": true,
+  "counts": {
+    "42:0.01": {
+      "positive": 26,
+      "negative": 32464
+    },
+    "42:0.02": {
+      "positive": 51,
+      "negative": 64928
+    },
+    "42:0.05": {
+      "positive": 127,
+      "negative": 162320
+    },
+    "42:0.2": {
+      "positive": 506,
+      "negative": 649279
+    },
+    "43:0.01": {
+      "positive": 26,
+      "negative": 32464
+    },
+    "43:0.02": {
+      "positive": 51,
+      "negative": 64928
+    },
+    "43:0.05": {
+      "positive": 127,
+      "negative": 162320
+    },
+    "43:0.2": {
+      "positive": 506,
+      "negative": 649279
+    },
+    "44:0.01": {
+      "positive": 26,
+      "negative": 32464
+    },
+    "44:0.02": {
+      "positive": 51,
+      "negative": 64928
+    },
+    "44:0.05": {
+      "positive": 127,
+      "negative": 162320
+    },
+    "44:0.2": {
+      "positive": 506,
+      "negative": 649279
+    }
+  }
+}
