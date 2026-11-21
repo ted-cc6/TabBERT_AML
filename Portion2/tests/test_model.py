@@ -79,6 +79,17 @@ def test_padding_does_not_change_real_outputs(data, specs):
     torch.testing.assert_close(clean_out[event_mask], noisy_out[event_mask])
 
 
+def test_field_chunking_does_not_change_output(data, specs):
+    tokens, event_mask = real_batch(data, 8)  # 8 x 32 = 256 field sequences
+    torch.manual_seed(0)
+    model = enc.TabBERT(specs, enc.EncoderConfig()).eval()
+    with torch.no_grad():
+        whole = model.encode(tokens, event_mask)
+        model.FIELD_CHUNK = 100  # forces 3 chunks
+        chunked = model.encode(tokens, event_mask)
+    torch.testing.assert_close(whole, chunked)
+
+
 def test_mask_fields_rates(data, specs):
     tokens, event_mask = real_batch(data, 2048)
     generator = torch.Generator().manual_seed(0)

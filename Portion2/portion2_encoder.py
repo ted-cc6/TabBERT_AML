@@ -76,6 +76,11 @@ def select_fields(tokens: torch.Tensor, use_dt: bool) -> torch.Tensor:
 class TabBERT(nn.Module):
     """Two-level encoder: a field transformer inside each event, then a sequence transformer across events."""
 
+    # The field transformer sees B * L short sequences. CUDA attention kernels fail ("invalid argument") once
+    # sequences x heads passes about 65,535 in one call (export batch 2048 x 32 rows x 2 heads = 131,072),
+    # so feed it in chunks. Each event is encoded independently, so chunking does not change the output.
+    FIELD_CHUNK = 8192
+
     def __init__(self, specs: list[FieldSpec], cfg: EncoderConfig):
         super().__init__()
         assert len(specs) == (6 if cfg.use_dt else 5)
@@ -121,7 +126,7 @@ class TabBERT(nn.Module):
         batch, length, n_fields = tokens.shape
         fields = torch.stack([emb(tokens[..., f]) for f, emb in enumerate(self.field_embeddings)], dim=2)
         fields = fields.reshape(batch * length, n_fields, -1) + self.field_position
-        fields = self.field_encoder(fields)
+        fields = torch.cat([self.field_encoder(chunk) for chunk in fields.split(self.FIELD_CHUNK)])
         events = self.event_projection(fields.reshape(batch, length, -1))
         events = self.dropout(self.input_norm(events + self.sequence_position[:length]))
         return self.sequence_encoder(events, src_key_padding_mask=~event_mask)
