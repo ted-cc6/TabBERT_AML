@@ -1,0 +1,6 @@
+{
+  "run_name": "abl_whole_mask_seed42",
+  "seed": 42,
+  "masking": "event",
+  "use_dt": true
+}

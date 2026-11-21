@@ -1,0 +1,11 @@
+{
+  "run_name": "smoke_cpu",
+  "seed": 42,
+  "masking": "field",
+  "use_dt": true,
+  "windows_per_epoch": 50000,
+  "epochs": 1,
+  "valid_windows": 5000,
+  "warmup_steps": 20,
+  "amp": false
+}
