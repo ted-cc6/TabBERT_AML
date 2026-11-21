@@ -245,10 +245,10 @@
 ### Task 8: Remaining checkpoints and hand-off. Step 8 (changed 2026-11-20)
 
 **Files:**
-- Modify: notebook section 9 (`PRETRAIN_RUNS`); sections 6 to 8 take lists of runs (`EXPORT_RUNS`, `FT_RUNS`, `RECON_RUNS`)
+- Modify: notebook section 5b (`PRETRAIN_RUNS`, placed before the exports); sections 6 to 8 take lists of runs (`EXPORT_RUNS`, `FT_RUNS`, `RECON_RUNS`)
 - Create: `Portion2/HANDOFF.md` (instructions for Portions 3 and 4)
 
-- [ ] **Step 1: Owner runs notebook section 9.** It pretrains `main_seed43`, `main_seed44`, `abl_whole_mask_seed42` and `abl_no_dt_seed42`, about 7 minutes each. Expected: 5 checkpoints on Drive, each with `metrics.csv`.
+- [ ] **Step 1 (Portion 3, changed 2026-11-20): run notebook section 5b.** It pretrains `main_seed43`, `main_seed44`, `abl_whole_mask_seed42` and `abl_no_dt_seed42`, about 7 minutes each. Expected: 5 checkpoints on Drive, each with `metrics.csv`.
 - [ ] **Step 2: Owner shares the `TabBERT_AML` Drive folder** with Portions 3 and 4 as Editors, and sends the hand-off message pointing to `HANDOFF.md`.
 - [ ] **Step 3 (Portion 3): embeddings for the other 4 checkpoints and the fine-tuning grid**, from sections 6 and 7.
 - [ ] **Step 4 (Portion 4): reconstruction scores for `main_seed43` and `main_seed44`**, from section 8.

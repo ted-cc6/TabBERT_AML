@@ -1,16 +1,18 @@
 # Portion 2 hand-off: how Portions 3 and 4 use the encoder
 
-Portion 2 delivers what the project plan lists as its hand-off: trained checkpoints, an embedding export script and a scoring function, all runnable from [`Portion2_Encoder.ipynb`](Portion2_Encoder.ipynb) on Colab. Portion 3 runs the fine-tuned encoder for Experiments A and C (project plan, Portion 3). Portion 4 uses the reconstruction scores for Experiment B. Design details: [`PORTION2_BUILD_GUIDE.md`](PORTION2_BUILD_GUIDE.md).
+Portion 2 delivers the encoder, the pretraining, export and scoring code, and one verified end-to-end run on `main_seed42`, all runnable from [`Portion2_Encoder.ipynb`](Portion2_Encoder.ipynb) on Colab. Portion 3 runs the fine-tuned encoder for Experiments A and C (project plan, Portion 3). Portion 4 uses the reconstruction scores for Experiment B. Design details: [`PORTION2_BUILD_GUIDE.md`](PORTION2_BUILD_GUIDE.md).
 
 ## 1. Who runs what
 
 | Work | Owner | Notebook section |
 | --- | --- | --- |
-| Pretrain all 5 checkpoints | Portion 2 | 3 and 9 |
-| Embeddings for `main_seed42`, one reference fine-tuning run (5%, seed 42), reconstruction scores for `main_seed42` | Portion 2 | 6, 7, 8 |
-| Embeddings for the other 4 checkpoints | Portion 3 | 6 (`EXPORT_RUNS`) |
+| Model, pretraining code, tests; `main_seed42` pretrained, its embeddings, one reference fine-tuning run (5%, seed 42) and its reconstruction scores | Portion 2 | 3 to 8 |
+| Pretrain the other 4 checkpoints (about 30 minutes) | Portion 3 | 5b (`PRETRAIN_RUNS`) |
+| Embeddings for those 4 checkpoints | Portion 3 | 6 (`EXPORT_RUNS`) |
 | Fine-tuning grid for Experiments A and C (18 runs) | Portion 3 | 7 (`FT_RUNS`) |
-| Reconstruction scores for `main_seed43` and `main_seed44` | Portion 4 | 8 (`RECON_RUNS`) |
+| Reconstruction scores for `main_seed43` and `main_seed44` | Portion 4, after Portion 3 has run 5b | 8 (`RECON_RUNS`) |
+
+For Portion 3, one session can run the notebook from the top: sections 1 to 5 take a few minutes (finished work is skipped), then 5b pretrains, 6 exports and 7 fine-tunes.
 
 ## 2. Getting set up (once)
 
@@ -19,9 +21,27 @@ Portion 2 delivers what the project plan lists as its hand-off: trained checkpoi
 3. Open `Portion2/Portion2_Encoder.ipynb` in Colab (File → Open notebook → GitHub → `ted-cc6/TabBERT_AML`, branch `main`) and pick an **L4 GPU** runtime. The VS Code Colab extension also works.
 4. Run sections 1, 2 and 2b (tests, about 5 minutes) first in every session. Do not continue if a test fails.
 
-Every section skips work that is already on Drive, so a disconnected session can be rerun from the top without losing anything. Sections 3 and 9 do not retrain checkpoints that exist.
+Every section skips work that is already on Drive, so a disconnected session can be rerun from the top without losing anything. Sections 3 and 5b do not retrain checkpoints that exist.
 
-## 3. Checkpoints (all on Drive under `portion2_runs/<run>/checkpoint.pt`)
+## 2b. What is in the Drive folder
+
+Git holds the code; the shared Drive folder `TabBERT_AML/portion2_runs/` holds everything the notebook produces, because the files are large and Colab runtimes are wiped after each session.
+
+```
+portion2_runs/
+├── main_seed42/                    checkpoint.pt, run_config.json, metrics.csv, amount_embedding_cosine.png,
+│                                   embeddings_main_seed42.npy (+ _ids.npy), recon_main_seed42.csv
+├── main_seed43/, main_seed44/,     added by section 5b (checkpoint.pt, metrics.csv, ...)
+│   abl_whole_mask_seed42/,         embeddings_<run>.npy added by section 6
+│   abl_no_dt_seed42/               recon_<run>.csv (main seeds only) added by section 8
+├── finetune/ft_<run>_<pct>pct_seed<seed>/   scores.csv, finetune_log.csv, summary.json (section 7)
+├── capacity_check_seed42/          model-size check: evidence only, not used downstream
+└── small_seed42/                   original 1.5M model: evidence only, not used downstream
+```
+
+If `small_seed42/` still contains a file called `embeddings_main_seed42.npy`, ignore it: it comes from the dropped 1.5M model (256 columns). The real one is in `main_seed42/` (512 columns).
+
+## 3. Checkpoints (on Drive under `portion2_runs/<run>/checkpoint.pt`; all but `main_seed42` come from section 5b)
 
 All use the same model: two-level TabBERT, 4 sequence layers, d_model 256, 4.29M parameters, pretrained on train-period windows only.
 
