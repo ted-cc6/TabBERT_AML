@@ -9,7 +9,7 @@ Design for Portion 2 of the TabBERT AML project. Read this first when resuming w
 | Portion 1 (data) | Done and verified. Walkthrough of all six themes done; findings in `TRADEOFFS.md`. |
 | This design | **Approved 2026-11-20** with the section 12 defaults recorded in the implementation plan |
 | Implementation plan | [`PORTION2_IMPLEMENTATION_PLAN.md`](PORTION2_IMPLEMENTATION_PLAN.md), approved 2026-11-20 |
-| Next step | Colab session: run the tests (cell 2b), retrain `main_seed42` with the 4.29M model, export its embeddings, first fine-tuning run at 5%, reconstruction scores |
+| Next step | Seed-42 end-to-end run done 2026-11-20 (49 tests passed on Colab). Left: notebook section 9 (other 4 checkpoints), share the Drive folder, send the hand-off message |
 | Code written | Tasks 1 to 7 code and tests. Tests run on Colab (notebook cell 2b) |
 
 ## 1. Intent
@@ -46,6 +46,7 @@ It also produces the RQ3 ablation checkpoints (masking type, with or without Δt
 | Model source | Built from scratch and pretrained on this data. No pretrained weights: Hugging Face text BERTs have an English vocabulary that means nothing for transaction tokens, and no published checkpoint exists for this dataset. | Owner approved |
 | Framework | Plain PyTorch (`nn.TransformerEncoder`), not Hugging Face `transformers` | Owner approved |
 | Compute | **All runs on Colab GPUs** (decided 2026-11-20): pretraining, exports, fine-tuning and scoring, through the VS Code Colab extension or the browser, on the Google AI Pro allowance (200 units a month; an L4 is available). The owner runs nothing heavy on the laptop. Small unit tests run on CPU during development only. | Owner |
+| Split of downstream work | Decided 2026-11-20, following the project plan: Portion 2 delivers the 5 checkpoints, the export and scoring code, and one verified end-to-end run on `main_seed42` (embeddings, one 5% fine-tuning run, reconstruction scores). **Portion 3** runs the embedding exports for the other 4 checkpoints and the fine-tuning grid (Experiments A and C). **Portion 4** runs the reconstruction scores for `main_seed43` and `main_seed44`. Instructions for them are in [`HANDOFF.md`](HANDOFF.md). | Owner |
 | Local GPU | Not used. The Intel Arc 130T (Core Ultra 5 225H) is not visible to PyTorch in WSL2. Tested again on 2026-11-20 on native Windows with PyTorch 2.15.0+xpu: the GPU is detected and the forward pass works, but the backward pass fails with `UR_RESULT_ERROR_OUT_OF_RESOURCES` even at batch 64, probably because the driver (32.0.101.6554) is too old. A driver update might fix this, but Colab GPUs are much faster for the full runs. The Windows environment `C:\Users\<user>\.venvs\tabbert-xpu` is kept for possible inference-only use. | Owner |
 
 ## 3. Approaches considered
@@ -168,15 +169,18 @@ Downstream seed pairing: downstream seed s uses the main checkpoint pretrained w
 - Per-field columns let Portion 4 normalise; the 30,531-way bank field would otherwise dominate the sum.
 - Activity-group normalisation is done by Portion 4.
 
-### 7d. Which checkpoints get which outputs *(builder's call)*
+### 7d. Which checkpoints get which outputs, and who runs them
 
-| Output | Checkpoints | Why |
+| Output | Checkpoints | Run by |
 | --- | --- | --- |
-| Embeddings (7a) | all 5 (main seeds 42, 43, 44; both ablations) | Experiment C goes through the Experiment A pipeline, which includes LightGBM plus embeddings |
-| Fine-tuning script runs (7b) | main seed 42 at 5% first (step 6); the full grid per section 12 | |
-| Reconstruction scores (7c) | main seeds 42, 43, 44 | RQ2 needs seed variation; ablations are not part of Experiment B |
+| Embeddings (7a) | `main_seed42` | Portion 2 |
+| | `main_seed43`, `main_seed44`, both ablations | Portion 3 (Experiment C goes through the Experiment A pipeline, which includes LightGBM plus embeddings) |
+| Fine-tuning (7b) | one reference run: `main_seed42`, 5%, seed 42 | Portion 2 |
+| | the grid: 4 fractions × 3 seeds on the main checkpoints, plus 2 ablations × 3 seeds at 5% (18 runs; add 2% if used) | Portion 3 |
+| Reconstruction scores (7c) | `main_seed42` | Portion 2 |
+| | `main_seed43`, `main_seed44` (RQ2 needs seed variation; ablations are not part of Experiment B) | Portion 4 |
 
-Storage: about 5 × 2.6 GB of embeddings on Drive, which fits the Google AI Pro storage.
+Storage: about 5 × 5.2 GB of embeddings on the shared Drive folder.
 
 ## 8. Code layout and environment
 
@@ -240,6 +244,6 @@ The plan's timeline puts steps 1 to 3 in week 2 and steps 4 to 6 in week 3.
 
 ## 12. Open questions (answer before planning)
 
-1. **Who runs the fine-tuning grid?** The project plan has Portion 3 running the fine-tuned encoder for Experiments A and C: 5 fractions × 3 seeds, plus 2 ablations × 3 seeds at 5%. If Portion 3 runs it, the Portion 2 script must work for a teammate unaided, with documented arguments and Drive paths. If Portion 2 runs it, it is most of this portion's GPU work. Agree this with the group.
+1. **Who runs the fine-tuning grid?** *Answered 2026-11-20:* Portion 3, as the project plan says. Portion 2 provides the script (notebook section 7) and one verified reference run. See section 2 and `HANDOFF.md`.
 2. **What is the deadline, and whose compute pays for the runs?** The 200 Colab units a month belong to the owner's Google AI Pro plan. With a deadline and a budget, we can decide on epoch caps (for example, subsampling negatives for the 100% fine-tuning runs) before the plan is written.
 3. **Embedding format** (section 7a): confirm 256 vs 128 values, and one file vs one file per split, with Portion 3. This can wait until step 5, but must be settled before the first full export.

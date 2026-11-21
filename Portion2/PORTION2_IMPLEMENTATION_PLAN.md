@@ -12,7 +12,7 @@
 
 ## Defaults for the guide's section 12 (approved 2026-11-20)
 
-1. **The owner runs the whole fine-tuning grid** on Colab. That is 5 fractions (1, 2, 5, 20, 100%) × 3 seeds, plus 2 ablations × 3 seeds at 5%: 21 runs.
+1. **Portion 3 runs the fine-tuning grid** (changed 2026-11-20 to match the project plan; the first default had the owner running it). Portion 2 provides the script and one reference run. The grid is 4 fractions (1, 5, 20, 100%) × 3 seeds, plus 2 ablations × 3 seeds at 5%: 18 runs, or 21 with the 2% subset.
 2. **Compute is the owner's 200 Colab units a month.** Epoch caps: pretraining 1M windows per epoch, at most 3 epochs. Fine-tuning at most 10 epochs with patience 3. Each fine-tuning epoch uses all positives in the subset plus at most 200,000 negatives, resampled every epoch. The cap only bites at 20% and 100%.
 3. **Embedding format:** 256 values in one file per checkpoint (guide section 7a). Confirm with Portion 3 before the first full export (Task 5).
 
@@ -174,7 +174,7 @@
 - [x] **Step 2: Owner runs cells 1 to 5 on a Colab GPU.** Note the units used per epoch, so we can budget the other 4 pretraining runs.
 - [x] **Step 2 (run).** Done 2026-11-20 on a Colab L4 in 4.8 min.
 - [x] **Step 3: Check the result.** Expected: `acc_<field>` is clearly above `baseline_<field>` for currency, bank, amount and time gap. If it is not, check the underfitting rule in guide section 5 before considering 4 layers. (Result: valid masked loss 0.810; accuracy against baseline: payment 0.869/0.408, currency 0.998/0.372, bank 0.811/0.025, direction 0.984/0.736, amount 0.730/0.057, time gap 0.244/0.138. No underfitting.)
-- [ ] **Step 4: Larger-model check (added 2026-11-20).** Compute is cheap on the L4, so run `configs/capacity_check_seed42.json` once: 4 sequence layers, d_model 256, feed-forward 1024, 4.29M parameters (RunConfig gained an `encoder` dict of EncoderConfig overrides). Rule, fixed before the run: keep the larger model only if its final validation masked loss is at least 5% lower than 0.810. Otherwise keep the 1.5M model for every checkpoint and downstream run.
+- [x] **Step 4: Larger-model check (added 2026-11-20).** Adopted: 0.669 against 0.810. Retrained as `main_seed42`: valid masked loss 0.6690. Compute is cheap on the L4, so run `configs/capacity_check_seed42.json` once: 4 sequence layers, d_model 256, feed-forward 1024, 4.29M parameters (RunConfig gained an `encoder` dict of EncoderConfig overrides). Rule, fixed before the run: keep the larger model only if its final validation masked loss is at least 5% lower than 0.810. Otherwise keep the 1.5M model for every checkpoint and downstream run.
 
 ### Task 5: Embedding export. Guide section 7a and step 5
 
@@ -194,8 +194,8 @@
   - `test_export_deterministic`: two exports are identical.
   - `test_export_matches_encode`: one row equals a manual `encode` of that window, within float16 tolerance.
 - [x] **Step 2: Run the tests, implement, run them again until they pass.** (2026-11-20: 4 export tests, including a no-Δt checkpoint; 37 tests in total.)
-- [ ] **Step 3: Agree the format with Portion 3.** The 128-value fallback is the first 128 columns of the 256-value file, so the export does not need to wait for this answer. Send them the shapes, the dtype and the id file. This settles question 3 of guide section 12.
-- [ ] **Step 4: Owner runs the full export for main seed 42 on Colab.** Expected: both files are on Drive, with 5,078,345 rows.
+- [ ] **Step 3: Agree the format with Portion 3** (in the hand-off message). The 128-value fallback is the first 128 columns of the 256-value file, so the export does not need to wait for this answer. Send them the shapes, the dtype and the id file. This settles question 3 of guide section 12.
+- [x] **Step 4: Owner runs the full export for main seed 42 on Colab.** (2026-11-20, 4.29M model: 5,078,345 × 512 in 169 s on an L4.) Expected: both files are on Drive, with 5,078,345 rows.
 
 ### Task 6: Fine-tuning head and the first 5% run. Guide section 7b and step 6
 
@@ -221,7 +221,7 @@
   - `test_negative_cap`: with `max_negatives_per_epoch=100`, an epoch sees every positive and exactly 100 negatives.
   - `test_finetune_smoke`: a smoke checkpoint, a tiny valid and test sample, 1 epoch. The score file has the right columns, contains only `valid` and `test` splits, and has finite scores.
 - [x] **Step 2: Implement.** Tests run on Colab (cell 2b), not locally.
-- [ ] **Step 3: Owner runs main seed 42 at 5% on Colab.** Expected: the valid PR AUC is logged and computed with `sklearn.metrics.average_precision_score`. Compare it with Portion 3's LightGBM at 5% once that exists. Switch to Portion 4's evaluation module when it lands.
+- [x] **Step 3: Owner runs main seed 42 at 5% on Colab.** (2026-11-20: best valid PR AUC 0.428 at epoch 4 of 7, about 45 s per epoch.) Expected: the valid PR AUC is logged and computed with `sklearn.metrics.average_precision_score`. Compare it with Portion 3's LightGBM at 5% once that exists. Switch to Portion 4's evaluation module when it lands.
 
 ### Task 7: Reconstruction score. Guide section 7c and step 7
 
@@ -240,21 +240,15 @@
   - `test_recon_masks_only_target_field`: patch the model to record its inputs. In each copy, exactly one token differs from the original window, at row 31 and the expected field.
   - `test_recon_sum`: `nll_sum` equals the sum of the 5 columns.
 - [x] **Step 2: Implement.** Tests run on Colab (cell 2b), not locally.
-- [ ] **Step 3: Owner runs it for main seed 42 on Colab.** Expected: the file is on Drive with 965,524 + 862,792 + 1,108 rows.
+- [x] **Step 3: Owner runs it for main seed 42 on Colab.** (2026-11-20: 1,829,424 rows in 254 s; valid PR AUC of nll_sum 0.0113 against a positive rate of 0.0011.) Expected: the file is on Drive with 965,524 + 862,792 + 1,108 rows.
 
-### Task 8: Remaining checkpoints and the grid. Step 8 and section 12 default 1
+### Task 8: Remaining checkpoints and hand-off. Step 8 (changed 2026-11-20)
 
 **Files:**
-- Modify: notebook, adding a "run all" section driven by a list of configs
+- Modify: notebook section 9 (`PRETRAIN_RUNS`); sections 6 to 8 take lists of runs (`EXPORT_RUNS`, `FT_RUNS`, `RECON_RUNS`)
+- Create: `Portion2/HANDOFF.md` (instructions for Portions 3 and 4)
 
-- [ ] **Step 1: Owner pretrains the remaining checkpoints:** `main_seed43`, `main_seed44`, `abl_whole_mask_seed42` and `abl_no_dt_seed42`. Then export embeddings for all 5 checkpoints (Task 5) and reconstruction scores for the 3 main seeds (Task 7).
-- [ ] **Step 2: Owner runs the fine-tuning grid.**
-  - Main: fractions 0.01, 0.02, 0.05, 0.2 and 1.0, with downstream seeds 42, 43 and 44. Each downstream seed uses the main checkpoint pretrained with the same seed.
-  - Ablations: 5% only, downstream seeds 42, 43 and 44, each using the ablation checkpoint pretrained with seed 42.
-  - The notebook skips any run whose score file already exists on Drive, so a disconnected runtime can resume.
-- [ ] **Step 3: Check the outputs.** Expected on Drive:
-  - 5 checkpoints.
-  - 5 embedding pairs.
-  - 3 reconstruction files.
-  - 21 score files.
-  - A `runs_summary.csv` that collects valid PR AUC per run.
+- [ ] **Step 1: Owner runs notebook section 9.** It pretrains `main_seed43`, `main_seed44`, `abl_whole_mask_seed42` and `abl_no_dt_seed42`, about 7 minutes each. Expected: 5 checkpoints on Drive, each with `metrics.csv`.
+- [ ] **Step 2: Owner shares the `TabBERT_AML` Drive folder** with Portions 3 and 4 as Editors, and sends the hand-off message pointing to `HANDOFF.md`.
+- [ ] **Step 3 (Portion 3): embeddings for the other 4 checkpoints and the fine-tuning grid**, from sections 6 and 7.
+- [ ] **Step 4 (Portion 4): reconstruction scores for `main_seed43` and `main_seed44`**, from section 8.
