@@ -9,8 +9,8 @@ Design for Portion 2 of the TabBERT AML project. Read this first when resuming w
 | Portion 1 (data) | Done and verified. Walkthrough of all six themes done; findings in `TRADEOFFS.md`. |
 | This design | **Approved 2026-11-20** with the section 12 defaults recorded in the implementation plan |
 | Implementation plan | [`PORTION2_IMPLEMENTATION_PLAN.md`](PORTION2_IMPLEMENTATION_PLAN.md), approved 2026-11-20 |
-| Next step | Task 4: the owner runs `Portion2_Encoder.ipynb` on a Colab GPU for main seed 42 |
-| Code written | Tasks 1 to 3 (`portion2_data.py`, `portion2_encoder.py`, `configs/`), 32 tests passing; Task 4 notebook `Portion2_Encoder.ipynb` |
+| Next step | Owner runs notebook sections 5 (larger-model check) and 6 (embedding export for main seed 42) on Colab |
+| Code written | Tasks 1 to 5 code, 37 tests passing. Task 4 run done 2026-11-20 (valid masked loss 0.810) |
 
 ## 1. Intent
 
@@ -45,7 +45,7 @@ It also produces the RQ3 ablation checkpoints (masking type, with or without Δt
 | Pretraining seeds | 3 seeds for the main checkpoint, 1 seed per ablation (5 pretraining runs). Downstream runs use 3 seeds everywhere. State this in the report. | Owner |
 | Model source | Built from scratch and pretrained on this data. No pretrained weights: Hugging Face text BERTs have an English vocabulary that means nothing for transaction tokens, and no published checkpoint exists for this dataset. | Owner approved |
 | Framework | Plain PyTorch (`nn.TransformerEncoder`), not Hugging Face `transformers` | Owner approved |
-| Compute | Real runs on Colab GPUs through the VS Code Colab extension, using the Google AI Pro compute allowance (200 units a month). Local work in WSL on CPU with small samples. | Owner approved |
+| Compute | **All runs on Colab GPUs** (decided 2026-11-20): pretraining, exports, fine-tuning and scoring, through the VS Code Colab extension or the browser, on the Google AI Pro allowance (200 units a month; an L4 is available). The owner runs nothing heavy on the laptop. Small unit tests run on CPU during development only. | Owner |
 | Local GPU | Not used. The Intel Arc 130T (Core Ultra 5 225H) is not visible to PyTorch in WSL2. Tested again on 2026-11-20 on native Windows with PyTorch 2.15.0+xpu: the GPU is detected and the forward pass works, but the backward pass fails with `UR_RESULT_ERROR_OUT_OF_RESOURCES` even at batch 64, probably because the driver (32.0.101.6554) is too old. A driver update might fix this, but Colab GPUs are much faster for the full runs. The Windows environment `C:\Users\<user>\.venvs\tabbert-xpu` is kept for possible inference-only use. | Owner |
 
 ## 3. Approaches considered
@@ -110,6 +110,7 @@ Input: B × 32 events × 6 field tokens (int)
 
 - Size: about 1 to 2M parameters (about half is the bank embedding table).
 - Go to 4 sequence layers only if 2 layers clearly underfit (training loss plateaus high and per-field accuracy stays near baseline).
+- The main run (2026-11-20) did not underfit. Because Colab L4 runs are cheap (4.8 min), one larger-model check is run anyway: 4 layers, d_model 256, 4.29M parameters. It is kept only if its validation masked loss is at least 5% lower.
 - Mixed precision on GPU.
 - Without-Δt variant: drop field 5 from the input and from the loss (5 fields instead of 6).
 
@@ -150,8 +151,8 @@ Downstream seed pairing: downstream seed s uses the main checkpoint pretrained w
 ### 7a. Frozen embeddings (to Portion 3)
 - Run the encoder without masking on every window (all splits, including tail).
 - Embedding = target-position vector (128) concatenated with the mean over non-PAD positions (128) = 256 values.
-- File per checkpoint: `embeddings_<run>_seed<s>.npy` (float16, shape 5,078,345 × 256, about 2.6 GB) plus `embeddings_<run>_seed<s>_ids.npy` (transaction_id per row).
-- Confirm the format with Portion 3 before the full export. A fallback is target-position only (128, about 1.3 GB).
+- File per checkpoint: `embeddings_<run_name>.npy` (float16, shape 5,078,345 × 256, about 2.6 GB) plus `embeddings_<run_name>_ids.npy` (transaction_id per row). Run names carry the seed, for example `embeddings_main_seed42.npy`.
+- Confirm the format with Portion 3. The fallback, target-position only (128 values), is simply the first 128 columns, so the export does not wait for this answer.
 
 ### 7b. Fine-tuning (Experiments A and C)
 - Head: a small MLP on the target-position vector, giving one laundering logit.

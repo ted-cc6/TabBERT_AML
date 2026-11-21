@@ -83,13 +83,24 @@ def test_lr_schedule():
 def test_configs_load():
     names = {p.stem for p in (PORTION2_DIR / "configs").glob("*.json")}
     assert names == {"smoke_cpu", "main_seed42", "main_seed43", "main_seed44",
-                     "abl_whole_mask_seed42", "abl_no_dt_seed42"}
+                     "abl_whole_mask_seed42", "abl_no_dt_seed42", "capacity_check_seed42"}
     for name in names:
         cfg = enc.load_run_config(PORTION2_DIR / "configs" / f"{name}.json")
         assert cfg.run_name == name
         assert cfg.masking in ("field", "event")
     assert enc.load_run_config(PORTION2_DIR / "configs" / "abl_no_dt_seed42.json").use_dt is False
     assert enc.load_run_config(PORTION2_DIR / "configs" / "abl_whole_mask_seed42.json").masking == "event"
+    assert enc.load_run_config(PORTION2_DIR / "configs" / "main_seed42.json").encoder == {}
+    assert enc.load_run_config(PORTION2_DIR / "configs" / "capacity_check_seed42.json").encoder == {
+        "d_model": 256, "seq_layers": 4, "ff": 1024}
+
+
+def test_encoder_override_reaches_the_model(tmp_path):
+    cfg = tiny_config(encoder={"d_model": 64, "seq_layers": 1, "ff": 128})
+    model, _, saved_cfg = enc.load_encoder(enc.pretrain(cfg, PROCESSED_DIR, tmp_path, device=torch.device("cpu")),
+                                           torch.device("cpu"))
+    assert model.cfg.d_model == 64 and model.cfg.seq_layers == 1
+    assert saved_cfg.encoder == {"d_model": 64, "seq_layers": 1, "ff": 128}
 
 
 def test_pretrain_smoke_reproducible(tmp_path):

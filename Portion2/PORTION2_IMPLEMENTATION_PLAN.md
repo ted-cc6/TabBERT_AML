@@ -169,8 +169,10 @@
   4. `pretrain(load_run_config("configs/main_seed42.json"), ...)`.
   5. Show `metrics.csv` as a table and display the cosine heatmap.
   - Keep each later task's cells in their own section, so one notebook covers every step.
-- [ ] **Step 2: Owner runs cells 1 to 5 on a Colab GPU.** Note the units used per epoch, so we can budget the other 4 pretraining runs.
-- [ ] **Step 3: Check the result.** Expected: `acc_<field>` is clearly above `baseline_<field>` for currency, bank, amount and time gap. If it is not, check the underfitting rule in guide section 5 before considering 4 layers.
+- [x] **Step 2: Owner runs cells 1 to 5 on a Colab GPU.** Note the units used per epoch, so we can budget the other 4 pretraining runs.
+- [x] **Step 2 (run).** Done 2026-11-20 on a Colab L4 in 4.8 min.
+- [x] **Step 3: Check the result.** Expected: `acc_<field>` is clearly above `baseline_<field>` for currency, bank, amount and time gap. If it is not, check the underfitting rule in guide section 5 before considering 4 layers. (Result: valid masked loss 0.810; accuracy against baseline: payment 0.869/0.408, currency 0.998/0.372, bank 0.811/0.025, direction 0.984/0.736, amount 0.730/0.057, time gap 0.244/0.138. No underfitting.)
+- [ ] **Step 4: Larger-model check (added 2026-11-20).** Compute is cheap on the L4, so run `configs/capacity_check_seed42.json` once: 4 sequence layers, d_model 256, feed-forward 1024, 4.29M parameters (RunConfig gained an `encoder` dict of EncoderConfig overrides). Rule, fixed before the run: keep the larger model only if its final validation masked loss is at least 5% lower than 0.810. Otherwise keep the 1.5M model for every checkpoint and downstream run.
 
 ### Task 5: Embedding export. Guide section 7a and step 5
 
@@ -180,17 +182,17 @@
 
 **Interfaces:**
 - Consumes: `load_encoder` and `iterate_batches`.
-- Produces: `export_embeddings(ckpt_path, processed_dir, out_dir, batch_size=2048, rows=None) -> tuple[Path, Path]`.
+- Produces: `export_embeddings(ckpt_path, processed_dir, out_dir, batch_size=2048, rows=None, device=None) -> tuple[Path, Path]`. Files are named `embeddings_<run_name>.npy` and `embeddings_<run_name>_ids.npy`; run names already carry the seed, for example `main_seed42`.
   - It writes `embeddings_<run>_seed<s>.npy`, float16, `(n, 256)`. Each row is the target-position vector (row 31) concatenated with the mean over real rows.
   - It also writes `embeddings_<run>_seed<s>_ids.npy` (int64 `transaction_id`) in `window_index` order.
   - It runs in eval mode, with no masking and no gradients, and writes through `np.lib.format.open_memmap` so the 2.6 GB array never sits in RAM.
 
-- [ ] **Step 1: Write the tests.** Use a 2K-window smoke checkpoint and `rows` set to the first 3,000 rows.
+- [x] **Step 1: Write the tests.** Use a 2K-window smoke checkpoint and `rows` set to the first 3,000 rows.
   - `test_export_shapes_and_dtype`: `(3000, 256)` float16, ids equal `window_index.transaction_id[:3000]`, and no NaN values.
   - `test_export_deterministic`: two exports are identical.
   - `test_export_matches_encode`: one row equals a manual `encode` of that window, within float16 tolerance.
-- [ ] **Step 2: Run the tests, implement, run them again until they pass.**
-- [ ] **Step 3: Agree the format with Portion 3.** Send them the shapes, the dtype and the id file. This settles question 3 of guide section 12.
+- [x] **Step 2: Run the tests, implement, run them again until they pass.** (2026-11-20: 4 export tests, including a no-Δt checkpoint; 37 tests in total.)
+- [ ] **Step 3: Agree the format with Portion 3.** The 128-value fallback is the first 128 columns of the 256-value file, so the export does not need to wait for this answer. Send them the shapes, the dtype and the id file. This settles question 3 of guide section 12.
 - [ ] **Step 4: Owner runs the full export for main seed 42 on Colab.** Expected: both files are on Drive, with 5,078,345 rows.
 
 ### Task 6: Fine-tuning head and the first 5% run. Guide section 7b and step 6

@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import math
 import time
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import numpy as np
@@ -202,6 +202,7 @@ class RunConfig:
     warmup_steps: int = 1000
     weight_decay: float = 0.01
     amp: bool = True
+    encoder: dict = field(default_factory=dict)  # EncoderConfig overrides, e.g. {"d_model": 256, "seq_layers": 4}
 
 
 def load_run_config(path: Path) -> RunConfig:
@@ -370,7 +371,7 @@ def pretrain(cfg: RunConfig, processed_dir: Path, out_dir: Path, device: torch.d
     baselines = fit_baselines(select_fields(torch.from_numpy(tokens), cfg.use_dt).numpy(), event_split, specs)
     valid_rows = pdata.sample_epoch_rows(window_index, "valid", cfg.valid_windows, cfg.seed, 0)
 
-    encoder_cfg = EncoderConfig(use_dt=cfg.use_dt)
+    encoder_cfg = EncoderConfig(**cfg.encoder, use_dt=cfg.use_dt)
     model = TabBERT(specs, encoder_cfg).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     steps_per_epoch = math.ceil(cfg.windows_per_epoch / cfg.batch_size)
@@ -428,3 +429,44 @@ def load_encoder(ckpt_path: Path, device: torch.device | None = None) -> tuple[T
     model = TabBERT(specs, EncoderConfig(**saved["encoder_config"]))
     model.load_state_dict(saved["state_dict"])
     return model.to(device).eval(), specs, RunConfig(**saved["run_config"])
+
+
+# ---------------------------------------------------------------- handoff 1: frozen embeddings (Task 5)
+
+@torch.no_grad()
+def export_embeddings(ckpt_path: Path, processed_dir: Path, out_dir: Path, batch_size: int = 2048,
+                      rows: np.ndarray | None = None, device: torch.device | None = None) -> tuple[Path, Path]:
+    """Write one embedding per window: the target-row vector, then the mean over real rows (2 x d_model, float16).
+
+    Rows follow window_index order (all splits, including tail) unless `rows` is given. The first d_model columns
+    alone are the target-position-only fallback. Writes through a memory map, so the full array never sits in RAM.
+    """
+    model, specs, cfg = load_encoder(ckpt_path, device)
+    device = next(model.parameters()).device
+    tokens = pdata.load_tokens(processed_dir)
+    window_index = pdata.load_window_index(processed_dir)
+    rows = np.arange(len(window_index)) if rows is None else np.asarray(rows)
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    emb_path = out_dir / f"embeddings_{cfg.run_name}.npy"
+    ids_path = out_dir / f"embeddings_{cfg.run_name}_ids.npy"
+    embeddings = np.lib.format.open_memmap(emb_path, mode="w+", dtype=np.float16,
+                                           shape=(len(rows), 2 * model.cfg.d_model))
+    begin, start = 0, time.time()
+    for batch in pdata.iterate_batches(tokens, window_index, rows, batch_size):
+        event_mask = batch["event_mask"].to(device)
+        with _autocast(device, cfg.amp):
+            hidden = model.encode(select_fields(batch["tokens"], cfg.use_dt).to(device), event_mask).float()
+        weights = event_mask.unsqueeze(-1).float()
+        mean = (hidden * weights).sum(1) / weights.sum(1)
+        out = torch.cat([hidden[:, -1], mean], dim=1)
+        embeddings[begin:begin + len(out)] = out.cpu().numpy().astype(np.float16)
+        begin += len(out)
+        if (begin // batch_size) % 500 == 0:
+            print(f"  {begin:,}/{len(rows):,} windows  {time.time() - start:.0f}s", flush=True)
+    embeddings.flush()
+    del embeddings
+    np.save(ids_path, window_index.transaction_id.to_numpy()[rows].astype(np.int64))
+    print(f"Wrote {emb_path.name} ({len(rows):,} x {2 * model.cfg.d_model}) in {time.time() - start:.0f}s", flush=True)
+    return emb_path, ids_path
