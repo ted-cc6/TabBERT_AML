@@ -475,3 +475,203 @@ def export_embeddings(ckpt_path: Path, processed_dir: Path, out_dir: Path, batch
     np.save(ids_path, window_index.transaction_id.to_numpy()[rows].astype(np.int64))
     print(f"Wrote {emb_path.name} ({len(rows):,} x {2 * model.cfg.d_model}) in {time.time() - start:.0f}s", flush=True)
     return emb_path, ids_path
+
+
+# ---------------------------------------------------------------- handoff 2: fine-tuning (Task 6)
+
+LABEL_FRACTIONS = (0.01, 0.02, 0.05, 0.2, 1.0)
+
+
+def load_label_subset(processed_dir: Path, fraction: float, seed: int) -> pd.DataFrame:
+    """Labelled train transactions for one fraction and seed: columns transaction_id, is_laundering.
+
+    1.0 reads the shared full-train list (the same for every seed); other fractions read label_subsets.csv.gz.
+    """
+    if not any(math.isclose(fraction, f) for f in LABEL_FRACTIONS):
+        raise ValueError(f"fraction must be one of {LABEL_FRACTIONS}, got {fraction}")
+    if math.isclose(fraction, 1.0):
+        return pd.read_csv(Path(processed_dir) / "label_subset_100pct.csv.gz")[["transaction_id", "is_laundering"]]
+    subsets = pd.read_csv(Path(processed_dir) / "label_subsets.csv.gz")
+    keep = (subsets.seed == seed) & np.isclose(subsets.label_fraction, fraction)
+    return subsets.loc[keep, ["transaction_id", "is_laundering"]].reset_index(drop=True)
+
+
+def finetune_epoch_sample(labels: np.ndarray, max_negatives: int, seed: int, epoch: int) -> np.ndarray:
+    """Positions for one epoch: every positive plus at most `max_negatives` negatives, shuffled."""
+    rng = np.random.default_rng([seed, epoch, 6])
+    positives = np.flatnonzero(labels == 1)
+    negatives = np.flatnonzero(labels == 0)
+    if len(negatives) > max_negatives:
+        negatives = rng.choice(negatives, size=max_negatives, replace=False)
+    return rng.permutation(np.concatenate([positives, negatives]))
+
+
+class FineTuneModel(nn.Module):
+    """Pretrained encoder plus a small MLP on the target-row vector, giving one laundering logit."""
+
+    def __init__(self, encoder: TabBERT, hidden: int = 64, dropout: float = 0.1):
+        super().__init__()
+        self.encoder = encoder
+        self.head = nn.Sequential(nn.Linear(encoder.cfg.d_model, hidden), nn.ReLU(), nn.Dropout(dropout),
+                                  nn.Linear(hidden, 1))
+
+    def forward(self, tokens: torch.Tensor, event_mask: torch.Tensor) -> torch.Tensor:
+        return self.head(self.encoder.encode(tokens, event_mask)[:, -1]).squeeze(-1)
+
+
+@torch.no_grad()
+def score_rows(model: FineTuneModel, tokens, window_index, rows, cfg: RunConfig, device, batch_size: int) -> np.ndarray:
+    """Laundering probability for each row, in `rows` order."""
+    model.eval()
+    scores = []
+    for batch in pdata.iterate_batches(tokens, window_index, rows, batch_size):
+        with _autocast(device, cfg.amp):
+            logits = model(select_fields(batch["tokens"], cfg.use_dt).to(device), batch["event_mask"].to(device))
+        scores.append(torch.sigmoid(logits.float()).cpu().numpy())
+    model.train()
+    return np.concatenate(scores)
+
+
+def finetune(ckpt_path: Path, processed_dir: Path, out_dir: Path, fraction: float, seed: int,
+             max_epochs: int = 10, patience: int = 3, max_negatives_per_epoch: int = 200_000,
+             lr: float = 2e-4, batch_size: int = 512, eval_rows: dict | None = None,
+             device: torch.device | None = None) -> Path:
+    """Fine-tune encoder and head end to end on one labelled subset; early stopping on valid PR AUC.
+
+    Only the labelled subset is used for training (unlabelled train transactions are not negatives). Writes
+    scores.csv (transaction_id, split, score for valid and test, from the best epoch) and finetune_log.csv to
+    out_dir/ft_<run>_<pct>pct_seed<seed>/ and returns the scores path. Test is scored but never used for choices.
+    """
+    from sklearn.metrics import average_precision_score
+
+    torch.manual_seed(seed)
+    encoder, specs, cfg = load_encoder(ckpt_path, device)
+    device = next(encoder.parameters()).device
+    model = FineTuneModel(encoder).to(device).train()
+    run_dir = Path(out_dir) / f"ft_{cfg.run_name}_{fraction * 100:g}pct_seed{seed}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    tokens = pdata.load_tokens(processed_dir)
+    window_index = pdata.load_window_index(processed_dir)
+    subset = load_label_subset(processed_dir, fraction, seed)
+    train_rows = pd.Index(window_index.transaction_id).get_indexer(subset.transaction_id)
+    assert (train_rows >= 0).all() and (window_index.split.to_numpy()[train_rows] == "train").all()
+    labels = subset.is_laundering.to_numpy()
+    split = window_index.split.to_numpy()
+    if eval_rows is None:
+        eval_rows = {name: np.flatnonzero(split == name) for name in ("valid", "test")}
+    valid_labels = window_index.is_laundering.to_numpy()[eval_rows["valid"]]
+
+    optimizer = torch.optim.AdamW([
+        {"params": model.encoder.parameters(), "lr": lr},
+        {"params": model.head.parameters(), "lr": lr * 5},
+    ], weight_decay=0.01)
+    scaler = torch.amp.GradScaler("cuda", enabled=cfg.amp and device.type == "cuda")
+    print(f"Fine-tuning {cfg.run_name} on {fraction:.0%} labels, seed {seed}: "
+          f"{labels.sum():,} positives, {(labels == 0).sum():,} negatives", flush=True)
+
+    best_ap, best_state, best_epoch, log, start = -1.0, None, 0, [], time.time()
+    for epoch in range(max_epochs):
+        picked = finetune_epoch_sample(labels, max_negatives_per_epoch, seed, epoch)
+        epoch_labels = torch.from_numpy(labels[picked]).float()
+        n_pos = float(epoch_labels.sum())
+        loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor((len(picked) - n_pos) / n_pos, device=device))
+        loss_sum, begin = 0.0, 0
+        for batch in pdata.iterate_batches(tokens, window_index, train_rows[picked], batch_size):
+            y = epoch_labels[begin:begin + len(batch["transaction_id"])].to(device)
+            begin += len(y)
+            with _autocast(device, cfg.amp):
+                logits = model(select_fields(batch["tokens"], cfg.use_dt).to(device), batch["event_mask"].to(device))
+            loss = loss_fn(logits.float(), y)
+            optimizer.zero_grad(set_to_none=True)
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            scaler.step(optimizer)
+            scaler.update()
+            loss_sum += loss.item() * len(y)
+
+        valid_scores = score_rows(model, tokens, window_index, eval_rows["valid"], cfg, device, batch_size * 4)
+        valid_ap = float(average_precision_score(valid_labels, valid_scores))
+        log.append({"epoch": epoch + 1, "train_loss": loss_sum / len(picked), "valid_ap": valid_ap,
+                    "seconds": round(time.time() - start, 1)})
+        pd.DataFrame(log).to_csv(run_dir / "finetune_log.csv", index=False)
+        print(f"  epoch {epoch + 1}: train loss {log[-1]['train_loss']:.4f}  valid PR AUC {valid_ap:.4f}  "
+              f"{log[-1]['seconds']:.0f}s", flush=True)
+        if valid_ap > best_ap:
+            best_ap, best_epoch = valid_ap, epoch + 1
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        elif epoch + 1 - best_epoch >= patience:
+            print(f"  early stop: no gain for {patience} epochs", flush=True)
+            break
+
+    model.load_state_dict(best_state)
+    frames = []
+    for name in ("valid", "test"):
+        rows = eval_rows[name]
+        frames.append(pd.DataFrame({
+            "transaction_id": window_index.transaction_id.to_numpy()[rows],
+            "split": name,
+            "score": score_rows(model, tokens, window_index, rows, cfg, device, batch_size * 4),
+        }))
+    scores_path = run_dir / "scores.csv"
+    pd.concat(frames).to_csv(scores_path, index=False)
+    (run_dir / "summary.json").write_text(json.dumps({
+        "run": cfg.run_name, "fraction": fraction, "seed": seed, "best_epoch": best_epoch,
+        "valid_ap": best_ap, "positives": int(labels.sum()), "negatives": int((labels == 0).sum()),
+    }, indent=2) + "\n")
+    print(f"Best epoch {best_epoch}: valid PR AUC {best_ap:.4f}. Wrote {scores_path}", flush=True)
+    return scores_path
+
+
+# ---------------------------------------------------------------- handoff 3: reconstruction score (Task 7)
+
+@torch.no_grad()
+def reconstruction_scores(ckpt_path: Path, processed_dir: Path, out_dir: Path,
+                          splits: tuple[str, ...] = ("valid", "test", "tail"), batch_size: int = 1024,
+                          rows: np.ndarray | None = None, device: torch.device | None = None) -> Path:
+    """Zero-shot anomaly score: for each target transaction, mask one target-row field at a time and record the
+    negative log likelihood of the true token. Direction is skipped (the target is always "sent").
+
+    Writes recon_<run>.csv with transaction_id, split, nll_<field> per scored field and nll_sum. Per-field columns
+    let Portion 4 normalise; the 30,531-way bank field would otherwise dominate the sum.
+    """
+    model, specs, cfg = load_encoder(ckpt_path, device)
+    device = next(model.parameters()).device
+    tokens = pdata.load_tokens(processed_dir)
+    window_index = pdata.load_window_index(processed_dir)
+    split = window_index.split.to_numpy()
+    if rows is None:
+        rows = np.flatnonzero(np.isin(split, splits))
+    scored = [f for f, s in enumerate(specs) if s.name != "direction"]
+
+    ids, nll_parts, start = [], [], time.time()
+    for batch in pdata.iterate_batches(tokens, window_index, rows, batch_size):
+        batch_tokens = select_fields(batch["tokens"], cfg.use_dt).to(device)
+        event_mask = batch["event_mask"].to(device)
+        columns = []
+        for f in scored:
+            masked = batch_tokens.clone()
+            masked[:, -1, f] = MASK
+            with _autocast(device, cfg.amp):
+                hidden = model.encode(masked, event_mask)[:, -1]
+                logits = model.field_logits(hidden, f)
+            log_probs = F.log_softmax(logits.float(), dim=-1)
+            columns.append(-log_probs.gather(1, batch_tokens[:, -1, f:f + 1]).squeeze(1))
+        nll_parts.append(torch.stack(columns, dim=1).cpu().numpy())
+        ids.append(batch["transaction_id"].numpy())
+        done = sum(len(i) for i in ids)
+        if (done // batch_size) % 500 == 0:
+            print(f"  {done:,}/{len(rows):,} windows  {time.time() - start:.0f}s", flush=True)
+
+    nll = np.concatenate(nll_parts)
+    out = pd.DataFrame({"transaction_id": np.concatenate(ids), "split": split[rows][:len(nll)]})
+    for j, f in enumerate(scored):
+        out[f"nll_{specs[f].name}"] = nll[:, j]
+    out["nll_sum"] = nll.sum(axis=1)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"recon_{cfg.run_name}.csv"
+    out.to_csv(path, index=False)
+    print(f"Wrote {path.name} ({len(out):,} rows) in {time.time() - start:.0f}s", flush=True)
+    return path

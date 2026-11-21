@@ -2,5 +2,10 @@
   "run_name": "main_seed43",
   "seed": 43,
   "masking": "field",
-  "use_dt": true
+  "use_dt": true,
+  "encoder": {
+    "d_model": 256,
+    "seq_layers": 4,
+    "ff": 1024
+  }
 }

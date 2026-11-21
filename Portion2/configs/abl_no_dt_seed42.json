@@ -2,5 +2,10 @@
   "run_name": "abl_no_dt_seed42",
   "seed": 42,
   "masking": "field",
-  "use_dt": false
+  "use_dt": false,
+  "encoder": {
+    "d_model": 256,
+    "seq_layers": 4,
+    "ff": 1024
+  }
 }

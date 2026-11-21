@@ -4,6 +4,8 @@
 
 **Architecture:** The data loader is in its own file, which the owner writes. All the other logic goes in one module, following the Portion 1 pattern, and a Colab notebook calls it step by step. Batches are built with vectorised NumPy indexing straight from the token matrix, so no `DataLoader` workers are needed.
 
+**Testing (changed 2026-11-20):** the suite runs on Colab as notebook cell 2b, including GPU smoke tests (`tests/test_gpu.py`) that skip without CUDA. The owner's laptop runs nothing heavy.
+
 **Tech stack:** Python 3.12, PyTorch 2.x (CPU locally, CUDA on Colab), NumPy, pandas, scikit-learn (`average_precision_score`), pytest.
 
 **Spec:** [`PORTION2_BUILD_GUIDE.md`](PORTION2_BUILD_GUIDE.md). Each task below names the guide section it implements.
@@ -205,19 +207,20 @@
 - Consumes: `load_encoder`, `iterate_batches` and `sample_epoch_rows`.
 - Produces:
   - `load_label_subset(processed_dir, fraction: float, seed: int) -> pd.DataFrame` gives `transaction_id, is_laundering`. Valid fractions are `{0.01, 0.02, 0.05, 0.2, 1.0}`. Any other value raises `ValueError`. A fraction of 1.0 reads `label_subset_100pct.csv.gz`.
-  - `FineTuneModel(nn.Module)` wraps the encoder with an MLP head (`128 → 64 → 1`, ReLU, dropout 0.1) on the target-position vector.
-  - `finetune(ckpt_path, processed_dir, out_dir, fraction, seed, max_epochs=10, patience=3, max_negatives_per_epoch=200_000, lr=2e-4, batch_size=512) -> Path`.
+  - `finetune_epoch_sample(labels, max_negatives, seed, epoch) -> np.ndarray` gives every positive plus at most `max_negatives` negatives, shuffled.
+  - `FineTuneModel(nn.Module)` wraps the encoder with an MLP head (`d_model → 64 → 1`, ReLU, dropout 0.1) on the target-position vector. The head's learning rate is 5 times the encoder's.
+  - `finetune(ckpt_path, processed_dir, out_dir, fraction, seed, max_epochs=10, patience=3, max_negatives_per_epoch=200_000, lr=2e-4, batch_size=512, eval_rows=None, device=None) -> Path`.
     - It uses `BCEWithLogitsLoss(pos_weight=n_neg/n_pos)`, where the counts come from that epoch's sample.
     - It early-stops on valid PR AUC.
-    - It writes `scores_<run>_seed<s>_frac<f>.csv` (`transaction_id, split, score`, valid and test rows only, from the best epoch) and `finetune_log.csv` (one row per epoch: train loss, valid PR AUC).
-    - It returns the score path.
+    - It writes to `out_dir/ft_<run>_<pct>pct_seed<seed>/`: `scores.csv` (`transaction_id, split, score`, valid and test rows only, from the best epoch), `finetune_log.csv` (one row per epoch: train loss, valid PR AUC) and `summary.json`.
+    - It returns the score path. Test AP is never computed here.
 
-- [ ] **Step 1: Write the tests.**
+- [x] **Step 1: Write the tests.** (2026-11-20, in `tests/test_finetune.py`, plus `tests/test_gpu.py`.)
   - `test_label_subset_counts`: seed 42 at 0.05 gives 127 positives and 162,320 negatives. A fraction of 1.0 gives 2,530 positives. A fraction of 0.03 raises `ValueError`.
   - `test_label_subset_train_only`: every `transaction_id` has `split == "train"` in `window_index`.
   - `test_negative_cap`: with `max_negatives_per_epoch=100`, an epoch sees every positive and exactly 100 negatives.
   - `test_finetune_smoke`: a smoke checkpoint, a tiny valid and test sample, 1 epoch. The score file has the right columns, contains only `valid` and `test` splits, and has finite scores.
-- [ ] **Step 2: Run the tests, implement, run them again until they pass.**
+- [x] **Step 2: Implement.** Tests run on Colab (cell 2b), not locally.
 - [ ] **Step 3: Owner runs main seed 42 at 5% on Colab.** Expected: the valid PR AUC is logged and computed with `sklearn.metrics.average_precision_score`. Compare it with Portion 3's LightGBM at 5% once that exists. Switch to Portion 4's evaluation module when it lands.
 
 ### Task 7: Reconstruction score. Guide section 7c and step 7
@@ -227,16 +230,16 @@
 - Test: `Portion2/tests/test_recon.py`
 
 **Interfaces:**
-- Produces: `reconstruction_scores(ckpt_path, processed_dir, out_dir, splits=("valid", "test", "tail"), batch_size=1024, rows=None) -> Path`.
+- Produces: `reconstruction_scores(ckpt_path, processed_dir, out_dir, splits=("valid", "test", "tail"), batch_size=1024, rows=None, device=None) -> Path`. It runs one forward pass per scored field, with only that target-row field masked, instead of building 5 copies of each window at once.
   - For each window, it builds 5 copies, each with one target-row field set to MASK. That covers every field except direction (and except Δt for a no-Δt checkpoint).
   - It records `-log p(true token)`.
   - It writes `recon_<run>_seed<s>.csv` with columns `transaction_id, split, nll_payment_format, nll_currency, nll_counterparty_bank, nll_amount_bucket, nll_time_gap_bucket, nll_sum`.
 
-- [ ] **Step 1: Write the tests.** Use a smoke checkpoint and 500 valid rows.
+- [x] **Step 1: Write the tests.** Use a smoke checkpoint and 500 valid rows. (2026-11-20, in `tests/test_recon.py`.)
   - `test_recon_columns_and_splits`: exact column list, `split` values within the requested splits, and NLL values that are finite and at least 0.
   - `test_recon_masks_only_target_field`: patch the model to record its inputs. In each copy, exactly one token differs from the original window, at row 31 and the expected field.
   - `test_recon_sum`: `nll_sum` equals the sum of the 5 columns.
-- [ ] **Step 2: Run the tests, implement, run them again until they pass.**
+- [x] **Step 2: Implement.** Tests run on Colab (cell 2b), not locally.
 - [ ] **Step 3: Owner runs it for main seed 42 on Colab.** Expected: the file is on Drive with 965,524 + 862,792 + 1,108 rows.
 
 ### Task 8: Remaining checkpoints and the grid. Step 8 and section 12 default 1

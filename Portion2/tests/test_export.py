@@ -1,29 +1,19 @@
 """Checks for the frozen embedding export (Task 5) on a tiny CPU checkpoint."""
 
-import dataclasses
-
 import numpy as np
 import pytest
 import torch
 
 import portion2_data as pdata
 import portion2_encoder as enc
-from conftest import PORTION2_DIR, PROCESSED_DIR
+from conftest import PROCESSED_DIR, tiny_checkpoint
 
 N_ROWS = 3000
 
 
-def tiny_checkpoint(tmp_dir, **overrides):
-    cfg = enc.load_run_config(PORTION2_DIR / "configs" / "smoke_cpu.json")
-    settings = dict(run_name="tiny_export", windows_per_epoch=1024, epochs=1, valid_windows=256,
-                    batch_size=256, warmup_steps=2, amp=False)
-    cfg = dataclasses.replace(cfg, **{**settings, **overrides})
-    return enc.pretrain(cfg, PROCESSED_DIR, tmp_dir, device=torch.device("cpu"))
-
-
 @pytest.fixture(scope="module")
 def checkpoint(tmp_path_factory):
-    return tiny_checkpoint(tmp_path_factory.mktemp("ckpt"))
+    return tiny_checkpoint(tmp_path_factory.mktemp("ckpt"), run_name="tiny_export")
 
 
 @pytest.fixture(scope="module")

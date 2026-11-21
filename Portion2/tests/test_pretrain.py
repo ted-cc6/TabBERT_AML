@@ -83,14 +83,19 @@ def test_lr_schedule():
 def test_configs_load():
     names = {p.stem for p in (PORTION2_DIR / "configs").glob("*.json")}
     assert names == {"smoke_cpu", "main_seed42", "main_seed43", "main_seed44",
-                     "abl_whole_mask_seed42", "abl_no_dt_seed42", "capacity_check_seed42"}
+                     "abl_whole_mask_seed42", "abl_no_dt_seed42", "capacity_check_seed42", "small_seed42"}
     for name in names:
         cfg = enc.load_run_config(PORTION2_DIR / "configs" / f"{name}.json")
         assert cfg.run_name == name
         assert cfg.masking in ("field", "event")
     assert enc.load_run_config(PORTION2_DIR / "configs" / "abl_no_dt_seed42.json").use_dt is False
     assert enc.load_run_config(PORTION2_DIR / "configs" / "abl_whole_mask_seed42.json").masking == "event"
-    assert enc.load_run_config(PORTION2_DIR / "configs" / "main_seed42.json").encoder == {}
+    # 2026-11-20: the larger model cut validation masked loss by 17.4% (rule: >= 5%), so all main and ablation
+    # runs use it; small_seed42 keeps the original 1.5M run on record.
+    big = {"d_model": 256, "seq_layers": 4, "ff": 1024}
+    for name in ("main_seed42", "main_seed43", "main_seed44", "abl_whole_mask_seed42", "abl_no_dt_seed42"):
+        assert enc.load_run_config(PORTION2_DIR / "configs" / f"{name}.json").encoder == big, name
+    assert enc.load_run_config(PORTION2_DIR / "configs" / "small_seed42.json").encoder == {}
     assert enc.load_run_config(PORTION2_DIR / "configs" / "capacity_check_seed42.json").encoder == {
         "d_model": 256, "seq_layers": 4, "ff": 1024}
 

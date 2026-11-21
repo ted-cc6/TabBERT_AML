@@ -9,8 +9,8 @@ Design for Portion 2 of the TabBERT AML project. Read this first when resuming w
 | Portion 1 (data) | Done and verified. Walkthrough of all six themes done; findings in `TRADEOFFS.md`. |
 | This design | **Approved 2026-11-20** with the section 12 defaults recorded in the implementation plan |
 | Implementation plan | [`PORTION2_IMPLEMENTATION_PLAN.md`](PORTION2_IMPLEMENTATION_PLAN.md), approved 2026-11-20 |
-| Next step | Owner runs notebook sections 5 (larger-model check) and 6 (embedding export for main seed 42) on Colab |
-| Code written | Tasks 1 to 5 code, 37 tests passing. Task 4 run done 2026-11-20 (valid masked loss 0.810) |
+| Next step | Colab session: run the tests (cell 2b), retrain `main_seed42` with the 4.29M model, export its embeddings, first fine-tuning run at 5%, reconstruction scores |
+| Code written | Tasks 1 to 7 code and tests. Tests run on Colab (notebook cell 2b) |
 
 ## 1. Intent
 
@@ -111,6 +111,7 @@ Input: B × 32 events × 6 field tokens (int)
 - Size: about 1 to 2M parameters (about half is the bank embedding table).
 - Go to 4 sequence layers only if 2 layers clearly underfit (training loss plateaus high and per-field accuracy stays near baseline).
 - The main run (2026-11-20) did not underfit. Because Colab L4 runs are cheap (4.8 min), one larger-model check is run anyway: 4 layers, d_model 256, 4.29M parameters. It is kept only if its validation masked loss is at least 5% lower.
+- **Result (2026-11-20): larger model adopted.** Validation masked loss 0.669 against 0.810 (17.4% lower), with higher accuracy on every field (bank 0.852 vs 0.811, amount 0.791 vs 0.730, payment format 0.906 vs 0.869, time gap 0.259 vs 0.244). It trains in 7.1 min on an L4. All main and ablation runs use 4 sequence layers, d_model 256, feed-forward 1024 (4.29M parameters); embeddings are therefore 512 values (target row 256 + mean 256). The 1.5M run is kept on record as `small_seed42`. Only validation data was used for this choice. Larger sizes were not tried, to avoid open-ended tuning.
 - Mixed precision on GPU.
 - Without-Δt variant: drop field 5 from the input and from the loss (5 fields instead of 6).
 
@@ -150,9 +151,9 @@ Downstream seed pairing: downstream seed s uses the main checkpoint pretrained w
 
 ### 7a. Frozen embeddings (to Portion 3)
 - Run the encoder without masking on every window (all splits, including tail).
-- Embedding = target-position vector (128) concatenated with the mean over non-PAD positions (128) = 256 values.
-- File per checkpoint: `embeddings_<run_name>.npy` (float16, shape 5,078,345 × 256, about 2.6 GB) plus `embeddings_<run_name>_ids.npy` (transaction_id per row). Run names carry the seed, for example `embeddings_main_seed42.npy`.
-- Confirm the format with Portion 3. The fallback, target-position only (128 values), is simply the first 128 columns, so the export does not wait for this answer.
+- Embedding = target-position vector (d_model) concatenated with the mean over non-PAD positions (d_model): 512 values with the adopted d_model 256 (256 with the original 128).
+- File per checkpoint: `embeddings_<run_name>.npy` (float16, shape 5,078,345 × 2·d_model: 512 values and about 5.2 GB with the adopted d_model 256) plus `embeddings_<run_name>_ids.npy` (transaction_id per row). Run names carry the seed, for example `embeddings_main_seed42.npy`.
+- Confirm the format with Portion 3. The fallback, target-position only, is simply the first d_model columns, so the export does not wait for this answer.
 
 ### 7b. Fine-tuning (Experiments A and C)
 - Head: a small MLP on the target-position vector, giving one laundering logit.
