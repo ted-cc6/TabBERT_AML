@@ -248,8 +248,8 @@
 - Modify: notebook section 5b (`PRETRAIN_RUNS`, placed before the exports); sections 6 to 8 take lists of runs (`EXPORT_RUNS`, `FT_RUNS`, `RECON_RUNS`)
 - Create: `Portion2/HANDOFF.md` (instructions for Portions 3 and 4)
 
-- [ ] **Step 1 (Portion 2): run notebook section 5b.** It pretrains `main_seed43`, `main_seed44`, `abl_whole_mask_seed42` and `abl_no_dt_seed42`, about 7 minutes each. Expected: 5 checkpoints on Drive, each with `metrics.csv`.
-- [ ] **Step 2 (Portion 2): run notebook section 6 with all 5 runs in `EXPORT_RUNS`.** Expected: `embeddings_<run>.npy` (5,078,345 × 512) and `_ids.npy` next to each checkpoint.
+- [x] **Step 1 (Portion 2): run notebook section 5b.** (2026-11-25: done, results in HANDOFF.md section 3.) It pretrains `main_seed43`, `main_seed44`, `abl_whole_mask_seed42` and `abl_no_dt_seed42`, about 7 minutes each. Expected: 5 checkpoints on Drive, each with `metrics.csv`.
+- [x] **Step 2 (Portion 2): run notebook section 6 with all 5 runs in `EXPORT_RUNS`.** (2026-11-25: done, all 5 files checked.) Expected: `embeddings_<run>.npy` (5,078,345 × 512) and `_ids.npy` next to each checkpoint.
 - [ ] **Step 3: Owner shares the `TabBERT_AML` Drive folder** with Portions 3 and 4 as Editors, and sends the hand-off message pointing to `HANDOFF.md`.
 - [ ] **Step 4 (Portion 3): the fine-tuning grid**, from section 7.
 - [ ] **Step 5 (Portion 4): reconstruction scores for `main_seed43` and `main_seed44`**, from section 8.

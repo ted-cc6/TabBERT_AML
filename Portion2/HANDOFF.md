@@ -53,6 +53,19 @@ All use the same model: two-level TabBERT, 4 sequence layers, d_model 256, 4.29M
 
 The ablations have one pretraining seed each; the report must say so. `small_seed42` and `capacity_check_seed42` are the model-size check (section 5 of the notebook) and are not used downstream.
 
+Pretraining results (all 5 runs on an L4, 3 epochs, about 7 minutes each; validation set):
+
+| Run | Valid masked loss | payment | currency | bank | direction | amount | time gap |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `main_seed42` | 0.6690 | 0.907 | 1.000 | 0.853 | 0.992 | 0.792 | 0.258 |
+| `main_seed43` | 0.6618 | 0.907 | 1.000 | 0.852 | 0.992 | 0.800 | 0.269 |
+| `main_seed44` | 0.6623 | 0.908 | 1.000 | 0.851 | 0.992 | 0.801 | 0.271 |
+| `abl_whole_mask_seed42` | 0.8056 | 0.819 | 0.999 | 0.782 | 0.959 | 0.705 | 0.308 |
+| `abl_no_dt_seed42` | 0.4077 | 0.889 | 0.999 | 0.832 | 0.982 | 0.777 | n/a |
+| Majority-class baseline | | 0.408 | 0.372 | 0.025 | 0.736 | 0.057 | 0.137 |
+
+The three main seeds agree within about 1% on loss and accuracy, so pretraining is stable across seeds. **Do not compare masked loss across the ablations:** whole-transaction masking hides the whole row, which is a harder task, and the no-Δt run does not predict time gap at all (the hardest field), so its average loss is lower by construction. Experiment C compares the ablations on downstream PR AUC, not on pretraining loss.
+
 ## 4. Embeddings for Portion 3 (section 6)
 
 - All 5 checkpoints are exported by Portion 2 (`EXPORT_RUNS` lists them). Each export takes about 3 minutes on an L4 plus the copy to Drive.
