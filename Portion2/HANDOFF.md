@@ -1,18 +1,18 @@
 # Portion 2 hand-off: how Portions 3 and 4 use the encoder
 
-Portion 2 delivers the encoder, the pretraining, export and scoring code, and one verified end-to-end run on `main_seed42`, all runnable from [`Portion2_Encoder.ipynb`](Portion2_Encoder.ipynb) on Colab. Portion 3 runs the fine-tuned encoder for Experiments A and C (project plan, Portion 3). Portion 4 uses the reconstruction scores for Experiment B. Design details: [`PORTION2_BUILD_GUIDE.md`](PORTION2_BUILD_GUIDE.md).
+Portion 2 delivers the encoder, the pretraining, export and scoring code, all 5 pretrained checkpoints with their embeddings, and one verified end-to-end run on `main_seed42`, all runnable from [`Portion2_Encoder.ipynb`](Portion2_Encoder.ipynb) on Colab. Portion 3 runs the fine-tuned encoder for Experiments A and C (project plan, Portion 3). Portion 4 uses the reconstruction scores for Experiment B. Design details: [`PORTION2_BUILD_GUIDE.md`](PORTION2_BUILD_GUIDE.md).
 
 ## 1. Who runs what
 
 | Work | Owner | Notebook section |
 | --- | --- | --- |
 | Model, pretraining code, tests; `main_seed42` pretrained, its embeddings, one reference fine-tuning run (5%, seed 42) and its reconstruction scores | Portion 2 | 3 to 8 |
-| Pretrain the other 4 checkpoints (about 30 minutes) | Portion 3 | 5b (`PRETRAIN_RUNS`) |
-| Embeddings for those 4 checkpoints | Portion 3 | 6 (`EXPORT_RUNS`) |
+| Pretrain the other 4 checkpoints (about 30 minutes) | Portion 2 | 5b (`PRETRAIN_RUNS`) |
+| Embeddings for those 4 checkpoints | Portion 2 | 6 (`EXPORT_RUNS`) |
 | Fine-tuning grid for Experiments A and C (18 runs) | Portion 3 | 7 (`FT_RUNS`) |
-| Reconstruction scores for `main_seed43` and `main_seed44` | Portion 4, after Portion 3 has run 5b | 8 (`RECON_RUNS`) |
+| Reconstruction scores for `main_seed43` and `main_seed44` | Portion 4 | 8 (`RECON_RUNS`) |
 
-For Portion 3, one session can run the notebook from the top: sections 1 to 5 take a few minutes (finished work is skipped), then 5b pretrains, 6 exports and 7 fine-tunes.
+All 5 checkpoints and their embeddings are on Drive before Portions 3 and 4 start. For Portion 3, one session can run the notebook from the top: sections 1 to 6 take a few minutes (finished work is skipped), then 7 fine-tunes.
 
 ## 2. Getting set up (once)
 
@@ -53,9 +53,9 @@ All use the same model: two-level TabBERT, 4 sequence layers, d_model 256, 4.29M
 
 The ablations have one pretraining seed each; the report must say so. `small_seed42` and `capacity_check_seed42` are the model-size check (section 5 of the notebook) and are not used downstream.
 
-## 4. Portion 3: embeddings (section 6)
+## 4. Embeddings for Portion 3 (section 6)
 
-- Add runs to `EXPORT_RUNS`, for example `["main_seed42", "main_seed43", "main_seed44", "abl_whole_mask_seed42", "abl_no_dt_seed42"]`. Each export takes about 3 minutes on an L4 plus the copy to Drive.
+- All 5 checkpoints are exported by Portion 2 (`EXPORT_RUNS` lists them). Each export takes about 3 minutes on an L4 plus the copy to Drive.
 - Output per run, next to its checkpoint: `embeddings_<run>.npy` (float16, 5,078,345 × 512, about 5.2 GB) and `embeddings_<run>_ids.npy` (the `transaction_id` of each row).
 - Columns 0 to 255 are the target transaction's vector; columns 256 to 511 are the mean over the window. For a smaller feature set, use the first 256 columns.
 - Rows cover every transaction (train, valid, test, tail). **Join on `transaction_id`**, never on row order of other files.

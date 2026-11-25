@@ -46,7 +46,7 @@ It also produces the RQ3 ablation checkpoints (masking type, with or without Δt
 | Model source | Built from scratch and pretrained on this data. No pretrained weights: Hugging Face text BERTs have an English vocabulary that means nothing for transaction tokens, and no published checkpoint exists for this dataset. | Owner approved |
 | Framework | Plain PyTorch (`nn.TransformerEncoder`), not Hugging Face `transformers` | Owner approved |
 | Compute | **All runs on Colab GPUs** (decided 2026-11-20): pretraining, exports, fine-tuning and scoring, through the VS Code Colab extension or the browser, on the Google AI Pro allowance (200 units a month; an L4 is available). The owner runs nothing heavy on the laptop. Small unit tests run on CPU during development only. | Owner |
-| Split of downstream work | Decided 2026-11-20: Portion 2 delivers the model, all code and tests, and one verified end-to-end run on `main_seed42` (checkpoint, embeddings, one 5% fine-tuning run, reconstruction scores). **Portion 3** pretrains the other 4 checkpoints (notebook section 5b, about 30 minutes), exports their embeddings and runs the fine-tuning grid (Experiments A and C). **Portion 4** runs the reconstruction scores for `main_seed43` and `main_seed44`. The project plan lists trained checkpoints as Portion 2's hand-off, so Portion 3 is asked to agree to pretraining. Instructions: [`HANDOFF.md`](HANDOFF.md). | Owner |
+| Split of downstream work | Decided 2026-11-20: Portion 2 delivers the model, all code and tests, and one verified end-to-end run on `main_seed42` (checkpoint, embeddings, one 5% fine-tuning run, reconstruction scores). **Portion 3** runs the fine-tuning grid (Experiments A and C). **Portion 4** runs the reconstruction scores for `main_seed43` and `main_seed44`. Changed 2026-11-25: Portion 2 pretrains the other 4 checkpoints (notebook section 5b, about 30 minutes) and exports their embeddings, as the project plan lists trained checkpoints and embeddings as Portion 2's work. Instructions: [`HANDOFF.md`](HANDOFF.md). | Owner |
 | Local GPU | Not used. The Intel Arc 130T (Core Ultra 5 225H) is not visible to PyTorch in WSL2. Tested again on 2026-11-20 on native Windows with PyTorch 2.15.0+xpu: the GPU is detected and the forward pass works, but the backward pass fails with `UR_RESULT_ERROR_OUT_OF_RESOURCES` even at batch 64, probably because the driver (32.0.101.6554) is too old. A driver update might fix this, but Colab GPUs are much faster for the full runs. The Windows environment `C:\Users\<user>\.venvs\tabbert-xpu` is kept for possible inference-only use. | Owner |
 
 ## 3. Approaches considered
@@ -173,8 +173,7 @@ Downstream seed pairing: downstream seed s uses the main checkpoint pretrained w
 
 | Output | Checkpoints | Run by |
 | --- | --- | --- |
-| Embeddings (7a) | `main_seed42` | Portion 2 |
-| | `main_seed43`, `main_seed44`, both ablations | Portion 3 (Experiment C goes through the Experiment A pipeline, which includes LightGBM plus embeddings) |
+| Embeddings (7a) | all 5 checkpoints | Portion 2 (Experiment C goes through the Experiment A pipeline, which includes LightGBM plus embeddings) |
 | Fine-tuning (7b) | one reference run: `main_seed42`, 5%, seed 42 | Portion 2 |
 | | the grid: 4 fractions × 3 seeds on the main checkpoints, plus 2 ablations × 3 seeds at 5% (18 runs; add 2% if used) | Portion 3 |
 | Reconstruction scores (7c) | `main_seed42` | Portion 2 |
