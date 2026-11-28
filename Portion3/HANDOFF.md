@@ -61,6 +61,8 @@ the full 2.5 GPU hours if anything looks inconsistent.
 | Scoring every run into `results/runs.csv` | Portion 3 | Code ready |
 | Published reference numbers | Portion 3 | Done: [`REFERENCE_NUMBERS.md`](REFERENCE_NUMBERS.md), verified against the papers |
 | Account-history diagnostic (not a run) | Portion 3 | Done: `diagnose_account_history.py`, numbers in section 14 |
+| Pass-through diagnostic (not a run) | Portion 3 | Done: `diagnose_pass_through.py`, numbers in section 12 |
+| Sequence-feature LightGBM fairness baseline | Portion 3 | Done: `diagnose_sequence_baseline.py`, 0.0411 valid AP |
 | Portion 2 checkpoints + embeddings + reference run | Portion 2 | Done |
 | Reconstruction scores for seeds 43/44, Experiment B analysis | Portion 4 | Not started |
 
@@ -350,9 +352,10 @@ with `window_index`. The model generalises to the later test days.
   events, against 7% of negatives. The model captures 83% of those positives in the top
   1,000 rows and 94% in the top 1%. The other 548 positives are captured at 13% and 37%.
 - **The baseline cannot express this.** The 21 engineered features have no exact-amount,
-  order-aware feature of that kind. Five hand-made sequence features added to LightGBM
-  reach only 0.0083 valid AP, so the encoder uses more than the binary pattern; the
-  enrichment shows where its high scores come from.
+  order-aware feature of that kind. A LightGBM with 14 hand-made sequence features reaches
+  0.0411 valid AP and 0.0326 test, about a tenth of the encoder; five of those features
+  alone reached 0.0083. The encoder uses more than the binary pattern, but the enrichment
+  shows where its high scores come from.
 - **Per typology.** Test recall at the 1% budget is 0.79 to 0.93 for all eight typologies,
   because most schemes contain a pass-through leg. H2 in the plan concerns the unsupervised
   reconstruction score, so this does not contradict it.
@@ -366,6 +369,17 @@ laundering.
 **Checks that remain for the next machine.** Run `reference-check` on the Drive file to
 write the marker there, confirm the row count, and watch seed 43 at 5% when the grid runs.
 If it lands far from 0.43, compare its log and command with seed 42.
+
+**Reproduce the two diagnostics.** Both are scripts and neither touches the results log:
+
+```bash
+python Portion3/diagnose_pass_through.py --scores <path>/scores.csv
+python Portion3/diagnose_sequence_baseline.py
+```
+
+They write JSON under `Portion3/outputs/`. The pass-through script needs only the score
+file and the processed data; the sequence baseline trains one LightGBM at 100% labels and
+takes about a minute.
 
 
 **Other checks:**
@@ -429,6 +443,12 @@ If it lands far from 0.43, compare its log and command with seed 42.
   advantage: 0.072 is what account history alone buys at 100% labels, so a fine-tuned
   encoder above that is doing more than recognising known accounts. Write the numbers into
   the limitations section. The diagnostic does not write to `results/runs.csv`.
+- **Hand-made sequence features close about a tenth of the gap.** A LightGBM with the 21
+  engineered features plus 14 window features (pass-through, burst shape, bank and amount
+  diversity, gap statistics) reaches 0.0411 valid and 0.0326 test PR AUC at 100% labels.
+  The encoder reaches 0.428 at 5% labels. The extra features help (3x the feature
+  baseline) and remain an order of magnitude short, which is the fair-baseline result to
+  quote when someone asks whether a few clever features would have sufficed.
 
 ---
 
@@ -442,6 +462,9 @@ If it lands far from 0.43, compare its log and command with seed 42.
 | `Portion3/run_finetune.py` | Fine-tuning grid runner (wraps Portion 2) |
 | `Portion3/prepare_embeddings.py` | Verify and slice the 26 GB embedding exports |
 | `Portion3/diagnose_account_history.py` | Account-history diagnostic (not part of the log) |
+| `Portion3/sequence_features.py` | Window features used by the two diagnostics |
+| `Portion3/diagnose_pass_through.py` | Pass-through analysis of the reference scores |
+| `Portion3/diagnose_sequence_baseline.py` | LightGBM with hand-made sequence features |
 | `Portion3/configs/lightgbm.json` | Frozen LightGBM / Isolation Forest settings |
 | `Portion3/tests/` | 25 synthetic-fixture tests |
 | `Portion3/Portion3_Baselines.ipynb` | Tabular stages, readable wrappers around the CLI |
