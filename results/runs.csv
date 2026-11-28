@@ -1,0 +1,1 @@
+run_id,portion,method,pretrain_run,label_fraction,seed,valid_ap,test_ap,test_f1,threshold,test_precision_at_0.5pct,test_recall_at_0.5pct,test_precision_at_1pct,test_recall_at_1pct,per_typology_recall_at_1pct,train_positives,train_negatives,runtime_s,git_commit,created_at,notes
