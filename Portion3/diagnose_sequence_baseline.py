@@ -9,10 +9,10 @@ and writes a JSON report. It is not part of results/runs.csv.
     python Portion3/diagnose_sequence_baseline.py
     python Portion3/diagnose_sequence_baseline.py --max-rounds 300
 
-Expected (2026-11-28): valid PR AUC 0.0411, test 0.0326, far below the fine-tuned
-encoder's 0.428 at 5% labels. The extra features help against the 0.0123 feature-only
-baseline and remain an order of magnitude short, so the gap is representation rather
-than one missing feature.
+Expected (2026-11-28): valid PR AUC 0.0411 at 100% labels and 0.0151 at 5% (test 0.0326
+and 0.0047). The fine-tuned encoder reaches 0.428 at 5% labels. The extra features help
+against the 0.0123 feature-only baseline and remain an order of magnitude short, so the
+gap is the representation, not one missing feature.
 """
 
 from __future__ import annotations
@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=REPO_ROOT / "Portion3" / "configs" / "lightgbm.json")
     parser.add_argument("--max-rounds", type=int, default=400)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--fraction", type=float, default=1.0,
+                        help="labelled training fraction (0.01, 0.02, 0.05, 0.2, 1.0)")
     parser.add_argument("--num-threads", type=int, default=None)
     parser.add_argument("--out", type=Path,
                         default=REPO_ROOT / "Portion3" / "outputs" / "sequence_baseline_diagnostic.json")
@@ -69,13 +71,17 @@ def main(argv: list[str] | None = None) -> int:
     for j, name in enumerate(sequence_features.FEATURE_NAMES):
         X[:, data.n_features + j] = seq[name]
 
-    train = np.flatnonzero(data.train_mask)
     valid, test = data.valid_positions, data.test_positions
+    subset = pb.load_label_subset(args.processed_dir, args.fraction, args.seed)
+    train_positions = pd.Index(data.ids).get_indexer(subset.transaction_id.to_numpy())
+    if (train_positions < 0).any():
+        raise SystemExit("label subset ids missing from window_index")
+    train_labels = subset.is_laundering.to_numpy(np.int8)
     config = pb._config(args.config)
     num_threads = args.num_threads or (os.cpu_count() or 4)
     train_start = time.perf_counter()
     booster, best_iteration = pb.train_lightgbm(
-        X[train], data.labels[train], X[valid], data.labels[valid],
+        X[train_positions], train_labels, X[valid], data.labels[valid],
         data.cat_indices, config, num_threads, args.seed, args.max_rounds,
     )
     valid_scores = pb.predict(booster, X[valid], best_iteration)
@@ -85,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     summary.update({
         "seed": args.seed,
-        "label_fraction": 1.0,
+        "label_fraction": args.fraction,
         "features": data.n_features + len(sequence_features.FEATURE_NAMES),
         "sequence_features": sequence_features.FEATURE_NAMES,
         "best_iteration": best_iteration,
@@ -97,7 +103,18 @@ def main(argv: list[str] | None = None) -> int:
         "note": "diagnostic only; not in results/runs.csv",
     })
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    records = []
+    if args.out.exists():
+        try:
+            loaded = json.loads(args.out.read_text())
+            records = loaded if isinstance(loaded, list) else [loaded]
+        except json.JSONDecodeError:
+            records = []
+    records = [item for item in records if not (
+        item.get("seed") == args.seed and abs(item.get("label_fraction", -1) - args.fraction) < 1e-12
+    )]
+    records.append(summary)
+    args.out.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
     print(
         f"valid AP {summary['valid_ap']:.4f} | test AP {summary['test_ap']:.4f} | "
         f"test F1 {summary['test_f1']:.4f} | best iter {best_iteration} | "

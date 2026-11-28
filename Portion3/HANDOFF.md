@@ -62,7 +62,7 @@ the full 2.5 GPU hours if anything looks inconsistent.
 | Published reference numbers | Portion 3 | Done: [`REFERENCE_NUMBERS.md`](REFERENCE_NUMBERS.md), verified against the papers |
 | Account-history diagnostic (not a run) | Portion 3 | Done: `diagnose_account_history.py`, numbers in section 14 |
 | Pass-through diagnostic (not a run) | Portion 3 | Done: `diagnose_pass_through.py`, numbers in section 12 |
-| Sequence-feature LightGBM fairness baseline | Portion 3 | Done: `diagnose_sequence_baseline.py`, 0.0411 valid AP |
+| Sequence-feature LightGBM fairness baseline | Portion 3 | Done: `diagnose_sequence_baseline.py`, 0.0411 (100%) / 0.0151 (5%) valid AP |
 | Portion 2 checkpoints + embeddings + reference run | Portion 2 | Done |
 | Reconstruction scores for seeds 43/44, Experiment B analysis | Portion 4 | Not started |
 
@@ -353,9 +353,10 @@ with `window_index`. The model generalises to the later test days.
   1,000 rows and 94% in the top 1%. The other 548 positives are captured at 13% and 37%.
 - **The baseline cannot express this.** The 21 engineered features have no exact-amount,
   order-aware feature of that kind. A LightGBM with 14 hand-made sequence features reaches
-  0.0411 valid AP and 0.0326 test, about a tenth of the encoder; five of those features
-  alone reached 0.0083. The encoder uses more than the binary pattern, but the enrichment
-  shows where its high scores come from.
+  0.0411 valid AP at 100% labels and 0.0151 at 5% (test 0.0326 and 0.0047). At the same 5%
+  budget as the reference run, that is 28x below the encoder's 0.428; five of those
+  features alone reached 0.0083. The encoder uses more than the binary pattern, but the
+  enrichment shows where its high scores come from.
 - **Per typology.** Test recall at the 1% budget is 0.79 to 0.93 for all eight typologies,
   because most schemes contain a pass-through leg. H2 in the plan concerns the unsupervised
   reconstruction score, so this does not contradict it.
@@ -443,12 +444,13 @@ takes about a minute.
   advantage: 0.072 is what account history alone buys at 100% labels, so a fine-tuned
   encoder above that is doing more than recognising known accounts. Write the numbers into
   the limitations section. The diagnostic does not write to `results/runs.csv`.
-- **Hand-made sequence features close about a tenth of the gap.** A LightGBM with the 21
-  engineered features plus 14 window features (pass-through, burst shape, bank and amount
-  diversity, gap statistics) reaches 0.0411 valid and 0.0326 test PR AUC at 100% labels.
-  The encoder reaches 0.428 at 5% labels. The extra features help (3x the feature
-  baseline) and remain an order of magnitude short, which is the fair-baseline result to
-  quote when someone asks whether a few clever features would have sufficed.
+- **Hand-made sequence features do not substitute for the encoder.** A LightGBM with the
+  21 engineered features plus 14 window features (pass-through, burst shape, bank and
+  amount diversity, gap statistics) reaches 0.0411 valid and 0.0326 test PR AUC at 100%
+  labels, and 0.0151 valid and 0.0047 test at 5% labels. The encoder reaches 0.428 at 5%.
+  The extra features triple the feature-only baseline at 100% and stay 28x short at the
+  same 5% budget, which is the fair-baseline result to quote when someone asks whether a
+  few clever features would have sufficed.
 
 ---
 
