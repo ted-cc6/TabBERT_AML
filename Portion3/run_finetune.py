@@ -2,7 +2,9 @@
 
 This is the agent-friendly equivalent of notebook section 7 in Portion 2. It
 needs PyTorch and a GPU (or CPU, which is far too slow). Finished runs are
-skipped, so the grid is resumable across sessions.
+skipped, so the grid is resumable across sessions. The runner refuses to start
+unless a passing reference check exists at Portion3/outputs/reference_check.json
+(see HANDOFF.md section 12).
 
     python Portion3/run_finetune.py \
         --checkpoint-dir /path/to/portion2_runs \
@@ -51,6 +53,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--device", default="auto", help="auto | cuda | cpu")
     parser.add_argument("--force", action="store_true", help="rerun runs that already have scores.csv")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--reference-check-file", type=Path,
+                        default=REPO_ROOT / "Portion3" / "outputs" / "reference_check.json")
+    parser.add_argument("--skip-reference-check", action="store_true",
+                        help="start the grid without a passing reference check (only after talking to the team)")
     return parser.parse_args(argv)
 
 
@@ -68,6 +74,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {run.run_id:<44} {run.pretrain_run:<24} {run.fraction:.0%} seed {run.seed}")
     if args.dry_run:
         return 0
+
+    marker = Path(args.reference_check_file)
+    if args.skip_reference_check:
+        print("WARNING: starting the grid without a passing reference check.")
+    elif not marker.exists():
+        raise SystemExit(
+            "Reference check missing. Before the grid, reproduce Portion 2's reference run:\n"
+            "  python -m Portion3.portion3_baselines reference-check --scores-root <drive>/finetune\n"
+            "If the check cannot pass and the team agrees to proceed, pass --skip-reference-check."
+        )
+    else:
+        report = json.loads(marker.read_text())
+        if report.get("status") != "pass":
+            raise SystemExit(
+                f"Reference check FAILED ({marker}). Do not start the grid. "
+                "See HANDOFF.md section 12. Override only with --skip-reference-check after talking to the team."
+            )
+        print(f"reference check: pass (valid AP {report.get('valid_ap')})")
 
     try:
         import torch

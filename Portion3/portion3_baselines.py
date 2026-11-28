@@ -577,6 +577,11 @@ def tune(args) -> None:
 
 FT_PATTERN = re.compile(r"^ft_(?P<checkpoint>.+)_(?P<pct>\d+(?:\.\d+)?)pct_seed(?P<seed>\d+)$")
 
+# Portion 2's reference run and the value it reported (HANDOFF.md, section 6).
+REFERENCE_RUN = "ft_main_seed42_5pct_seed42"
+REFERENCE_VALID_AP = 0.428
+REFERENCE_TOLERANCE = 0.02
+
 
 def parse_finetune_folder(name: str) -> tuple[str, float, int]:
     match = FT_PATTERN.match(name)
@@ -635,6 +640,71 @@ def score_finetune(args) -> None:
         print(f"logged {run_id}: test AP {row['test_ap']:.4f}, F1 {row['test_f1']:.4f}")
 
 
+def reference_check(args) -> int:
+    """Reproduce Portion 2's reference fine-tune number from its score file.
+
+    Writes a JSON marker that ``run_finetune.py`` requires before starting the grid.
+    Returns 0 on pass, 1 on a metric mismatch, 2 when the score file is missing.
+    """
+    folder = Path(args.scores_root) / REFERENCE_RUN
+    scores_path = folder / "scores.csv"
+    if not scores_path.exists():
+        print(f"missing reference score file: {scores_path}")
+        return 2
+    targets = load_targets(args.processed_dir).set_index("transaction_id")
+    targets = targets.rename(columns={"split": "target_split"})
+    scores = pd.read_csv(scores_path)
+    scores = scores.join(targets[["is_laundering", "typology", "target_split"]], on="transaction_id")
+    if scores.is_laundering.isna().any():
+        print("reference scores contain transaction ids absent from window_index")
+        return 2
+    if not (scores.split == scores.target_split).all():
+        print("reference scores split column disagrees with window_index")
+        return 2
+    valid = scores[scores.split == "valid"]
+    test = scores[scores.split == "test"]
+    summary = metrics.evaluate_scores(
+        valid.is_laundering.to_numpy(np.int8), valid.score.to_numpy(),
+        test.is_laundering.to_numpy(np.int8), test.score.to_numpy(),
+        test.typology.to_numpy(dtype=object),
+    )
+    valid_precision, valid_recall = metrics.precision_recall_at_budget(
+        valid.is_laundering.to_numpy(np.int8), valid.score.to_numpy(), 0.01
+    )
+    ap = summary["valid_ap"]
+    passed = abs(ap - args.expected_ap) <= args.tolerance
+    report = {
+        "run": REFERENCE_RUN,
+        "status": "pass" if passed else "fail",
+        "valid_ap": ap,
+        "expected_valid_ap": args.expected_ap,
+        "tolerance": args.tolerance,
+        "test_ap": summary["test_ap"],
+        "valid_precision_at_1pct": valid_precision,
+        "valid_recall_at_1pct": valid_recall,
+        "valid_rows": int(len(valid)),
+        "test_rows": int(len(test)),
+        "checked_at": metrics.utc_now(),
+        "git_commit": metrics.git_revision(REPO_ROOT),
+    }
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"reference {REFERENCE_RUN}: valid AP {ap:.4f} (reported {args.expected_ap:.3f} "
+        f"+/- {args.tolerance:.3f}); test AP {summary['test_ap']:.4f}; "
+        f"top 1% valid precision {valid_precision:.3f}, recall {valid_recall:.3f}"
+    )
+    if passed:
+        print(f"PASS. Wrote {args.out}. The fine-tuning grid may start.")
+        return 0
+    print(
+        "FAIL: the score file does not reproduce the reported value. Do not start the grid. "
+        "Check the score file, labels and how 0.428 was computed, then tell the team. "
+        f"Wrote {args.out}."
+    )
+    return 1
+
+
 # ------------------------------------------------------------------------- CLI
 
 
@@ -678,6 +748,14 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(p)
     p.add_argument("--scores-root", type=Path, required=True)
 
+    p = sub.add_parser("reference-check", help="reproduce Portion 2's reference fine-tune number")
+    add_common(p)
+    p.add_argument("--scores-root", type=Path, required=True)
+    p.add_argument("--expected-ap", type=float, default=REFERENCE_VALID_AP)
+    p.add_argument("--tolerance", type=float, default=REFERENCE_TOLERANCE)
+    p.add_argument("--out", type=Path, default=None,
+                   help="marker file (default: <outputs-dir>/reference_check.json)")
+
     p = sub.add_parser("summary", help="mean and spread of test AP by method and fraction")
     add_common(p)
     return parser
@@ -703,6 +781,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "score-finetune":
         score_finetune(args)
         return 0
+
+    if args.command == "reference-check":
+        args.out = args.out or (Path(args.outputs_dir) / "reference_check.json")
+        return reference_check(args)
 
     if args.command == "tune":
         tune(args)
