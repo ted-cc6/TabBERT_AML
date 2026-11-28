@@ -1,0 +1,10 @@
+numpy>=1.26
+pandas>=2.2
+scikit-learn>=1.4
+lightgbm>=4.3
+pytest>=8
+
+# torch is intentionally not pinned here. The fine-tuning notebook installs the
+# build that matches the machine:
+#   RTX 50-series (Blackwell, sm_120): pip install torch --index-url https://download.pytorch.org/whl/cu128
+#   Colab T4:                          pip install torch  (the image already has a CUDA build)
