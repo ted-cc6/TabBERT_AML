@@ -259,9 +259,10 @@ python -m Portion3.portion3_baselines score-finetune --scores-root <drive>/finet
 
 This reads every `ft_*/scores.csv`, checks the split column against `window_index`,
 applies the same metrics module as every tabular run, and appends one row per run. It
-also picks up the reference run. Expected per file: 1,829,424 rows (965,524 valid +
-862,792 test + 1,108 tail). If a fine-tune folder is missing, it is simply absent from
-the log; `plan` will still show it pending.
+also picks up the reference run. Expected per file: 1,828,316 rows (965,524 valid +
+862,792 test). Reconstruction score files have 1,829,424 rows because they also cover the
+1,108 tail transactions; fine-tune score files do not. If a fine-tune folder is missing,
+it is simply absent from the log; `plan` will still show it pending.
 
 ---
 
@@ -306,7 +307,7 @@ reference section. Mark the skipped runs as skipped in the log (do not fabricate
 
 ---
 
-## 12. Sanity checks and one open anomaly
+## 12. Sanity checks and the reference fine-tune
 
 **Reproduce the fine-tune reference first.** Portion 2 reports validation PR AUC **0.428**
 for `ft_main_seed42_5pct_seed42` (5%, seed 42) against a positive rate of 0.0011.
@@ -335,31 +336,41 @@ and 0.015 validation PR AUC:
 | Account laundering rate from all train labels | 0.0723 | 67x |
 | Reference fine-tune, 5% labels | **0.428** | **400x** |
 
-Two readings follow. Either the fine-tune found a real sequence signal that none of these
-captures, or the 0.428 is an artefact of that run or of how it was reported. A separate
-diagnostic (section 14) shows laundering is heavily account-concentrated, so an encoder
-that recognises account behaviour could in principle do much better than the aggregate
-features. Do not "fix" either number to make the curve look better.
+**Result (2026-11-27, on the downloaded score file): the check passes, and the number is
+real.** Valid AP is 0.427957, identical to the reported value; test AP is 0.399, 360 times
+the test base rate. The file has 1,828,316 rows, no duplicate ids, and every split agrees
+with `window_index`. The model generalises to the later test days.
 
-**Checks to run on the reference score file** (all read-only, none affect a choice):
+- **Not account memorisation.** AP on the 888,369 valid rows outside the 110 accounts that
+  hold a 5% positive is 0.463; inside those accounts it is 0.189. Only 4.2% of the top
+  1,000 rows come from those accounts, 86% of accounts have more than one distinct score,
+  and the rank correlation between score and the account's valid laundering rate is 0.187.
+- **Pass-through is where the confidence sits.** 47% of valid positives (488 of 1,036)
+  contain an earlier received event with the target's amount bucket in the last five
+  events, against 7% of negatives. The model captures 83% of those positives in the top
+  1,000 rows and 94% in the top 1%. The other 548 positives are captured at 13% and 37%.
+- **The baseline cannot express this.** The 21 engineered features have no exact-amount,
+  order-aware feature of that kind. Five hand-made sequence features added to LightGBM
+  reach only 0.0083 valid AP, so the encoder uses more than the binary pattern; the
+  enrichment shows where its high scores come from.
+- **Per typology.** Test recall at the 1% budget is 0.79 to 0.93 for all eight typologies,
+  because most schemes contain a pass-through leg. H2 in the plan concerns the unsupervised
+  reconstruction score, so this does not contradict it.
 
-- Row count 1,829,424 and unique transaction ids.
-- Valid top-1% precision and recall. AP 0.428 requires a large share of the 1,036
-  positives ranked near the very top, not merely a few percent precision in the top
-  10,000 rows. The `reference-check` output prints both; compare them with the
-  account-history diagnostic, whose AP 0.072 comes with top-1% precision 0.019.
-- Test AP from the same file. If valid stays at 0.43 while test collapses toward 0.01,
-  the ranking is tied to the validation period or to particular accounts.
-- Join scores to `from_account_key` and report what share of the top 1% comes from the
-  110 accounts that hold a 5% positive. A high share means account recognition, not
-  generalisation.
-- Re-run one seed at 5% after the grid starts (seed 43 is already in it). If 0.43 does
-  not recur, check the original run's command and output.
+**What this means for the report.** Report the reference result with the account breakdown
+and the pass-through numbers. The baseline is not broken: it lacks a sequence
+representation by construction, which is the comparison RQ1 asks for. Keep the
+synthetic-data caveat, since the pass-through signature may be more regular than real
+laundering.
+
+**Checks that remain for the next machine.** Run `reference-check` on the Drive file to
+write the marker there, confirm the row count, and watch seed 43 at 5% when the grid runs.
+If it lands far from 0.43, compare its log and command with seed 42.
 
 
 **Other checks:**
 - Each tabular `scores.csv.gz`: 1,828,316 rows.
-- Each fine-tune `scores.csv`: 1,829,424 rows.
+- Each fine-tune `scores.csv`: 1,828,316 rows.
 - `results/runs.csv`: 61 rows, no duplicate `run_id`, `created_at` timestamps in order.
 - Positive counts per subset: 1% = 26, 2% = 51, 5% = 127, 20% = 506, 100% = 2,530. If the
   log disagrees, the fraction was loaded wrongly.
